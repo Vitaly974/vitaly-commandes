@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VITALY — Espace de commande</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyCPVhX_CiavWcXtwBGKACXX29qqA3-405c",
+    authDomain: "vitaly-commandes.firebaseapp.com",
+    projectId: "vitaly-commandes",
+    storageBucket: "vitaly-commandes.firebasestorage.app",
+    messagingSenderId: "44218616859",
+    appId: "1:44218616859:web:a542c53b1e3fd64561bcbe"
+  };
+  const app = initializeApp(firebaseConfig);
+  const fdb = getFirestore(app);
+  window.firestoreDB = fdb;
+  window.fsLib = { collection, addDoc, onSnapshot, query, orderBy, doc, setDoc, updateDoc };
+  window.firebaseReady = true;
+  document.dispatchEvent(new Event('firebaseReady'));
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif;}
+:root{--g:#1E5C3A;--cr:#F5F0E8;--or:#E8613A;--gr:#888780;--lg:#B4B2A9;--bd:rgba(0,0,0,0.08);--pu:#7B5EA7;}
+body{background:var(--g);min-height:100vh;}
+.screen{display:none;flex-direction:column;min-height:100vh;}
+.screen.active{display:flex;}
+.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--g);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px;}
+.loading-txt{color:var(--cr);font-size:16px;font-weight:700;letter-spacing:4px;}
+.loading-sub{color:rgba(245,240,232,.5);font-size:11px;letter-spacing:1px;}
+#sh{align-items:center;padding:32px 16px;background:var(--g);min-height:100vh;justify-content:center;}
+.home-logo{text-align:center;margin-bottom:32px;}
+.home-brand{color:var(--cr);font-size:26px;font-weight:800;letter-spacing:5px;margin-top:12px;}
+.home-sub{color:rgba(245,240,232,.45);font-size:10px;letter-spacing:3px;margin-top:4px;}
+.hcard{background:rgba(245,240,232,.06);backdrop-filter:blur(10px);border:1px solid rgba(245,240,232,.1);border-radius:20px;padding:20px;width:100%;max-width:480px;}
+.section-lbl{font-size:9px;letter-spacing:3px;color:rgba(245,240,232,.4);margin-bottom:10px;text-align:center;}
+.prow{display:flex;gap:8px;margin-bottom:16px;}
+.pbtn{flex:1;display:flex;align-items:center;gap:10px;border-radius:12px;padding:14px 12px;cursor:pointer;border:1px solid rgba(245,240,232,.15);background:rgba(245,240,232,.08);transition:all .2s;}
+.pbtn:hover{background:rgba(245,240,232,.14);}
+.pbic{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.pbic-chef{background:rgba(30,92,58,.6);border:1px solid rgba(30,92,58,.8);}
+.pbic-mgr{background:rgba(123,94,167,.4);border:1px solid rgba(123,94,167,.6);}
+.pbn{color:var(--cr);font-size:12px;font-weight:700;letter-spacing:1px;}
+.pbd{color:rgba(245,240,232,.4);font-size:9px;margin-top:1px;}
+.hdiv{border:none;border-top:1px solid rgba(245,240,232,.08);margin:12px 0;}
+.slbl2{font-size:9px;letter-spacing:3px;color:rgba(245,240,232,.4);margin-bottom:10px;text-align:center;}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.sbtn{display:flex;align-items:center;gap:8px;border-radius:11px;padding:10px 12px;cursor:pointer;border:1px solid rgba(245,240,232,.12);background:rgba(245,240,232,.06);width:100%;transition:all .2s;}
+.sbtn:hover{background:rgba(245,240,232,.12);}
+.sbic{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;background:rgba(30,92,58,.5);border:1px solid rgba(30,92,58,.7);color:var(--cr);}
+.sbn{color:var(--cr);font-size:11px;font-weight:700;letter-spacing:.5px;}
+.sbh{color:rgba(245,240,232,.35);font-size:9px;}
+.sblk{color:rgba(245,240,232,.25);font-size:12px;margin-left:auto;}
+.sfull{grid-column:1/-1;}
+#sp{align-items:center;justify-content:center;padding:36px 14px;background:var(--g);min-height:100vh;}
+.pcard{background:rgba(245,240,232,.06);border:1px solid rgba(245,240,232,.12);border-radius:20px;padding:28px 22px;width:100%;max-width:290px;text-align:center;}
+.pt{font-size:18px;font-weight:700;color:var(--cr);margin-bottom:4px;}
+.pbadge{display:inline-block;background:rgba(245,240,232,.1);color:rgba(245,240,232,.6);font-size:9px;padding:3px 10px;border-radius:20px;margin-bottom:18px;letter-spacing:1px;}
+.phint{font-size:10px;color:rgba(245,240,232,.4);margin-bottom:10px;letter-spacing:2px;}
+.pdots{display:flex;gap:10px;justify-content:center;margin-bottom:6px;}
+.pdot{width:12px;height:12px;border-radius:50%;border:2px solid rgba(245,240,232,.3);background:transparent;transition:all .15s;}
+.pdot.filled{background:var(--cr);border-color:var(--cr);}
+.perr{color:var(--or);font-size:10px;margin-bottom:8px;min-height:14px;}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.pkey{background:rgba(245,240,232,.08);border:1px solid rgba(245,240,232,.12);border-radius:9px;padding:14px;font-size:18px;font-weight:600;color:var(--cr);cursor:pointer;transition:all .15s;}
+.pkey:hover{background:rgba(245,240,232,.16);}
+.pkey.del{font-size:13px;color:rgba(245,240,232,.4);}
+.pback{margin-top:14px;background:transparent;border:none;color:rgba(245,240,232,.35);font-size:11px;cursor:pointer;text-decoration:underline;}
+.hdr{background:var(--g);padding:12px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07);}
+.hdr-back{background:transparent;border:1px solid rgba(245,240,232,.2);border-radius:7px;color:rgba(245,240,232,.7);font-size:11px;cursor:pointer;padding:5px 10px;}
+.hdr-center{flex:1;text-align:center;}
+.hdr-lbl{color:rgba(245,240,232,.4);font-size:8px;letter-spacing:2px;}
+.hdr-val{color:var(--cr);font-size:13px;font-weight:700;}
+.hdr-badge{background:rgba(245,240,232,.1);border:1px solid rgba(245,240,232,.2);border-radius:7px;padding:5px 10px;color:var(--cr);font-size:10px;font-weight:700;}
+.tabs{background:#fff;border-bottom:.5px solid var(--bd);display:flex;overflow-x:auto;scrollbar-width:none;flex-shrink:0;position:relative;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{padding:10px 14px;font-size:11px;color:var(--gr);cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;white-space:nowrap;transition:all .15s;font-weight:500;position:relative;}
+.tab.active{color:var(--g);border-bottom-color:var(--g);font-weight:700;}
+.tab .badge{position:absolute;top:4px;right:4px;background:#E8613A;color:white;font-size:8px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:14px;text-align:center;}
+.tc{display:none;flex:1;flex-direction:column;}
+.tc.active{display:flex;}
+#ss{background:#F5F0E8;min-height:100vh;}
+.pdv-body{padding:12px;flex:1;overflow-y:auto;}
+.date-bar{background:white;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;border:.5px solid var(--bd);}
+.date-bar label{font-size:11px;font-weight:700;color:var(--g);white-space:nowrap;}
+.date-inp{flex:1;border:.5px solid var(--bd);border-radius:7px;padding:7px 10px;font-size:12px;color:#2C2C2A;background:var(--cr);}
+.sub-title{font-size:9px;letter-spacing:2px;color:var(--gr);font-weight:700;margin-bottom:6px;padding:4px 0;margin-top:12px;border-bottom:.5px solid var(--bd);}
+.sub-title:first-child{margin-top:0;}
+.prod-list{display:flex;flex-direction:column;gap:5px;margin-bottom:4px;}
+.prod-row{background:#fff;border:.5px solid var(--bd);border-radius:9px;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.prod-row.unavailable{opacity:.35;pointer-events:none;}
+.prod-check{width:18px;height:18px;border:2px solid var(--lg);border-radius:5px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.prod-check.checked{background:var(--g);border-color:var(--g);}
+.prod-check.checked::after{content:'✓';color:white;font-size:11px;font-weight:700;}
+.prod-info{flex:1;}
+.prod-name{font-size:11px;font-weight:600;color:#2C2C2A;}
+.prod-unit{font-size:9px;color:var(--lg);}
+.prod-qty-row{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.qm,.qp{width:28px;height:28px;border-radius:7px;border:none;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.qm{background:#F5F0E8;color:var(--gr);}
+.qp{background:var(--or);color:#fff;}
+.qv{width:32px;text-align:center;font-size:14px;color:#2C2C2A;font-weight:700;}
+.pdv-footer{padding:12px 14px;background:#fff;border-top:.5px solid var(--bd);flex-shrink:0;}
+.footer-sum{font-size:11px;color:var(--gr);margin-bottom:8px;}
+.send-btn{width:100%;padding:14px;border-radius:11px;border:none;font-size:14px;font-weight:700;cursor:pointer;background:var(--g);color:var(--cr);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;}
+.send-btn:disabled{opacity:.4;cursor:not-allowed;}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:white;border-radius:16px;padding:24px;width:100%;max-width:340px;text-align:center;}
+.modal-ic{font-size:40px;margin-bottom:12px;}
+.modal-title{font-size:16px;font-weight:700;color:#2C2C2A;margin-bottom:6px;}
+.modal-sub{font-size:12px;color:var(--gr);margin-bottom:12px;line-height:1.5;white-space:pre-line;}
+.modal-date{background:rgba(30,92,58,.08);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--g);font-weight:600;margin-bottom:16px;}
+.modal-btns{display:flex;gap:8px;}
+.modal-btn{flex:1;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;}
+.modal-btn-cancel{background:#F5F0E8;color:var(--gr);}
+.modal-btn-confirm{background:var(--g);color:white;}
+.route-info{font-size:9px;padding:5px 10px;border-radius:6px;margin:0 0 10px;text-align:center;font-weight:600;}
+.route-chef{background:rgba(30,92,58,.1);color:var(--g);}
+.route-mgr{background:rgba(123,94,167,.1);color:var(--pu);}
+#sc,#sm{background:#F5F0E8;min-height:100vh;}
+.space-body{padding:10px;flex:1;overflow-y:auto;}
+.empty-st{text-align:center;padding:40px 16px;color:var(--gr);font-size:12px;}
+.empty-ic{font-size:36px;margin-bottom:10px;}
+.ocard{background:#fff;border:.5px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px;}
+.ocard-head{display:flex;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap;}
+.ocard-store{font-size:13px;font-weight:700;color:var(--g);}
+.ocard-livraison{background:var(--or);color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;}
+.ocard-time{font-size:10px;color:var(--lg);margin-left:auto;}
+.cat-section{margin-bottom:10px;}
+.cat-lbl{font-size:9px;letter-spacing:1.5px;color:var(--gr);font-weight:700;margin-bottom:5px;text-transform:uppercase;background:rgba(0,0,0,.04);padding:3px 7px;border-radius:4px;display:inline-block;}
+.prod-line{display:flex;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(0,0,0,.05);font-size:11px;gap:6px;}
+.prod-line:last-child{border:none;}
+.prod-line-stock{font-size:9px;color:var(--lg);background:rgba(136,135,128,.1);border-radius:3px;padding:1px 5px;flex-shrink:0;}
+.prod-line-name{flex:1;color:#2C2C2A;}
+.prod-line-qty{font-weight:700;color:var(--g);flex-shrink:0;display:flex;align-items:center;gap:4px;}
+.edit-btn{background:none;border:.5px solid var(--bd);border-radius:4px;cursor:pointer;font-size:12px;color:var(--gr);padding:1px 5px;line-height:1.4;}
+.edit-btn:hover{background:#f0ece4;}
+.treat-btn{width:100%;margin-top:12px;padding:11px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:rgba(30,92,58,.08);color:var(--g);display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;}
+.treat-btn:hover{background:rgba(30,92,58,.15);}
+.mgr-treat-btn{background:rgba(123,94,167,.08);color:var(--pu);}
+.mgr-treat-btn:hover{background:rgba(123,94,167,.15);}
+/* Dashboard */
+.dash-section{padding:10px;overflow-y:auto;}
+.dash-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px;}
+.dash-card{background:#fff;border:.5px solid var(--bd);border-radius:10px;padding:12px;}
+.dash-card-lbl{font-size:9px;letter-spacing:1px;color:var(--gr);margin-bottom:4px;text-transform:uppercase;}
+.dash-card-val{font-size:22px;font-weight:700;color:var(--g);line-height:1;}
+.dash-card-sub{font-size:10px;color:var(--lg);margin-top:3px;}
+.fournisseur-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+.fcrd{background:#fff;border:.5px solid var(--bd);border-radius:11px;padding:12px;}
+.fcrd-label{font-size:9px;letter-spacing:1.5px;color:var(--gr);font-weight:700;margin-bottom:6px;text-transform:uppercase;}
+.fcrd-total{font-size:24px;font-weight:700;color:var(--g);line-height:1;}
+.fcrd-sub{font-size:10px;color:var(--lg);margin-top:3px;}
+.fcrd-pdvs{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;}
+.fcrd-pdv{font-size:9px;background:rgba(30,92,58,.08);color:var(--g);border-radius:3px;padding:2px 6px;}
+.fcrd-bar{height:3px;background:var(--bd);border-radius:2px;margin-top:10px;overflow:hidden;}
+.fcrd-bar-fill{height:100%;background:var(--g);border-radius:2px;transition:width .3s;}
+/* Manager orders */
+.mgr-body{padding:10px;flex:1;overflow-y:auto;}
+.mgr-empty{text-align:center;padding:40px 16px;color:var(--gr);font-size:12px;}
+/* Stock cards */
+.five-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.pdv-card{background:#fff;border:.5px solid var(--bd);border-radius:11px;overflow:hidden;}
+.pdv-card-head{background:var(--g);padding:9px 12px;display:flex;align-items:center;justify-content:space-between;}
+.pdv-card-name{color:var(--cr);font-size:11px;font-weight:700;}
+.pdv-card-total{background:rgba(255,255,255,.2);color:var(--cr);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.pdv-card-empty{padding:14px;font-size:10px;color:var(--lg);text-align:center;font-style:italic;}
+.card-sub{padding:6px 10px 4px;}
+.card-sub+.card-sub{border-top:.5px solid rgba(0,0,0,.06);}
+.card-sub-lbl{font-size:8px;letter-spacing:1.5px;color:var(--gr);font-weight:700;margin-bottom:4px;text-transform:uppercase;}
+.card-item{display:flex;align-items:baseline;padding:3px 0;border-bottom:.5px solid rgba(0,0,0,.04);font-size:10px;gap:4px;}
+.card-item:last-child{border:none;}
+.card-item-stock{font-size:8px;color:var(--lg);background:rgba(0,0,0,.05);border-radius:3px;padding:1px 4px;flex-shrink:0;}
+.card-item-name{flex:1;color:#2C2C2A;}
+.card-item-qty{font-weight:700;color:var(--g);flex-shrink:0;}
+.card-item-unit{font-size:8px;color:var(--lg);margin-left:2px;}
+.stock-card-head{background:var(--pu);}
+/* Chef catalogue */
+.cat-toggle-row{display:flex;align-items:center;padding:8px 12px;background:#fff;border:.5px solid var(--bd);border-radius:8px;margin-bottom:5px;gap:10px;cursor:pointer;}
+.cat-toggle-row:hover{background:#f9f7f4;}
+.toggle-switch{width:32px;height:18px;border-radius:9px;background:var(--lg);position:relative;flex-shrink:0;transition:background .15s;}
+.toggle-switch.on{background:var(--g);}
+.toggle-switch::after{content:'';position:absolute;width:14px;height:14px;background:white;border-radius:50%;top:2px;left:2px;transition:left .15s;}
+.toggle-switch.on::after{left:16px;}
+.cat-toggle-name{font-size:11px;font-weight:600;color:#2C2C2A;flex:1;}
+.cat-toggle-sub{font-size:9px;color:var(--lg);}
+.catalogue-section{margin-bottom:16px;}
+.catalogue-section-title{font-size:9px;letter-spacing:2px;color:var(--gr);font-weight:700;margin-bottom:6px;padding:4px 2px;border-bottom:.5px solid var(--bd);text-transform:uppercase;}
+/* Warn */
+.warn-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.warn-overlay.open{display:flex;}
+.warn-modal{background:white;border-radius:16px;padding:24px;width:100%;max-width:320px;text-align:center;}
+.warn-ic{font-size:36px;margin-bottom:10px;}
+.warn-title{font-size:15px;font-weight:700;color:#2C2C2A;margin-bottom:6px;}
+.warn-sub{font-size:12px;color:var(--gr);margin-bottom:18px;}
+.warn-btns{display:flex;gap:8px;}
+.warn-btn{flex:1;padding:11px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;}
+.warn-stay{background:var(--g);color:white;}
+.warn-leave{background:#F5F0E8;color:var(--gr);}
+/* Edit qty modal */
+.edit-modal{background:white;border-radius:14px;padding:20px;width:100%;max-width:280px;text-align:center;}
+.edit-modal-title{font-size:14px;font-weight:700;color:#2C2C2A;margin-bottom:4px;}
+.edit-modal-sub{font-size:11px;color:var(--gr);margin-bottom:16px;}
+.edit-qty-row{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;}
+.edit-qm,.edit-qp{width:36px;height:36px;border-radius:9px;border:none;cursor:pointer;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.edit-qm{background:#F5F0E8;color:var(--gr);}
+.edit-qp{background:var(--or);color:#fff;}
+.edit-qv{font-size:28px;font-weight:700;color:var(--g);min-width:40px;text-align:center;}
+.edit-save{width:100%;padding:11px;border-radius:9px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--g);color:white;}
+#ssucc{background:var(--g);align-items:center;justify-content:center;text-align:center;padding:40px 20px;min-height:100vh;}
+.succ-ic{font-size:52px;margin-bottom:14px;}
+.succ-t{color:var(--cr);font-size:18px;font-weight:700;margin-bottom:6px;}
+.succ-s{color:rgba(245,240,232,.65);font-size:12px;margin-bottom:24px;line-height:1.7;white-space:pre-line;}
+.succ-btn{background:var(--cr);color:var(--g);border:none;border-radius:11px;padding:13px 28px;font-size:14px;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <svg width="70" height="70" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <g transform="translate(100,100)">
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#8BC34A" transform="rotate(0)"/>
+      <ellipse cx="0" cy="-55" rx="8" ry="11" fill="#AED581" transform="rotate(18)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#558B2F" transform="rotate(36)"/>
+      <ellipse cx="0" cy="-55" rx="7" ry="10" fill="#E8613A" transform="rotate(54)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="12" fill="#9CCC65" transform="rotate(72)"/>
+      <ellipse cx="0" cy="-55" rx="8" ry="11" fill="#7B5EA7" transform="rotate(90)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#C5E1A5" transform="rotate(108)"/>
+      <ellipse cx="0" cy="-55" rx="7" ry="10" fill="#F4A261" transform="rotate(126)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="12" fill="#4CAF50" transform="rotate(144)"/>
+      <ellipse cx="0" cy="-55" rx="8" ry="11" fill="#DCE775" transform="rotate(162)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#A5D6A7" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-55" rx="7" ry="10" fill="#E57373" transform="rotate(198)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="12" fill="#66BB6A" transform="rotate(216)"/>
+      <ellipse cx="0" cy="-55" rx="8" ry="11" fill="#FFF176" transform="rotate(234)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#26A69A" transform="rotate(252)"/>
+      <ellipse cx="0" cy="-55" rx="7" ry="10" fill="#BCAAA4" transform="rotate(270)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="12" fill="#81C784" transform="rotate(288)"/>
+      <ellipse cx="0" cy="-55" rx="8" ry="11" fill="#FF8A65" transform="rotate(306)"/>
+      <ellipse cx="0" cy="-55" rx="9" ry="13" fill="#A5D6A7" transform="rotate(324)"/>
+      <ellipse cx="0" cy="-55" rx="7" ry="10" fill="#CE93D8" transform="rotate(342)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="9" fill="#558B2F" transform="rotate(9)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="8" fill="#AED581" transform="rotate(45)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="9" fill="#E8613A" transform="rotate(81)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="8" fill="#7B5EA7" transform="rotate(117)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="9" fill="#4CAF50" transform="rotate(153)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="8" fill="#DCE775" transform="rotate(189)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="9" fill="#F4A261" transform="rotate(225)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="8" fill="#81C784" transform="rotate(261)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="9" fill="#CE93D8" transform="rotate(297)"/>
+      <ellipse cx="0" cy="-32" rx="6" ry="8" fill="#8BC34A" transform="rotate(333)"/>
+    </g>
+  </svg>
+  <div class="loading-txt">VITALY</div>
+  <div class="loading-sub">Connexion en cours...</div>
+</div>
+
+<div class="warn-overlay" id="warn-overlay">
+  <div class="warn-modal">
+    <div class="warn-ic">⚠️</div>
+    <div class="warn-title">Commande non envoyée</div>
+    <div class="warn-sub">Vous avez des articles sélectionnés non envoyés. Si vous quittez, ils seront perdus.</div>
+    <div class="warn-btns">
+      <button class="warn-btn warn-stay" onclick="closeWarn()">Rester</button>
+      <button class="warn-btn warn-leave" onclick="forceLeave()">Quitter quand même</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="conf-modal">
+  <div class="modal">
+    <div class="modal-ic">📋</div>
+    <div class="modal-title" id="conf-title">Confirmer l'envoi</div>
+    <div class="modal-sub" id="conf-sub">—</div>
+    <div class="modal-date" id="conf-date">—</div>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="modal-btn modal-btn-confirm" onclick="confirmSend()">Envoyer ✓</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edit-modal">
+  <div class="edit-modal">
+    <div class="edit-modal-title" id="edit-prod-name">—</div>
+    <div class="edit-modal-sub" id="edit-prod-unit">—</div>
+    <div class="edit-qty-row">
+      <button class="edit-qm" onclick="editChg(-1)">−</button>
+      <span class="edit-qv" id="edit-qv">0</span>
+      <button class="edit-qp" onclick="editChg(1)">+</button>
+    </div>
+    <button class="edit-save" onclick="saveEdit()">Valider</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="sh" class="screen">
+  <div class="home-logo">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="90" height="90">
+      <g transform="translate(100,100)">
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#8BC34A" transform="rotate(0)"/>
+        <ellipse cx="0" cy="-52" rx="8" ry="11" fill="#AED581" transform="rotate(18)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#558B2F" transform="rotate(36)"/>
+        <ellipse cx="0" cy="-52" rx="7" ry="10" fill="#E8613A" transform="rotate(54)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="12" fill="#9CCC65" transform="rotate(72)"/>
+        <ellipse cx="0" cy="-52" rx="8" ry="11" fill="#7B5EA7" transform="rotate(90)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#C5E1A5" transform="rotate(108)"/>
+        <ellipse cx="0" cy="-52" rx="7" ry="10" fill="#F4A261" transform="rotate(126)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="12" fill="#4CAF50" transform="rotate(144)"/>
+        <ellipse cx="0" cy="-52" rx="8" ry="11" fill="#DCE775" transform="rotate(162)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#A5D6A7" transform="rotate(180)"/>
+        <ellipse cx="0" cy="-52" rx="7" ry="10" fill="#E57373" transform="rotate(198)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="12" fill="#66BB6A" transform="rotate(216)"/>
+        <ellipse cx="0" cy="-52" rx="8" ry="11" fill="#FFF176" transform="rotate(234)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#26A69A" transform="rotate(252)"/>
+        <ellipse cx="0" cy="-52" rx="7" ry="10" fill="#BCAAA4" transform="rotate(270)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="12" fill="#81C784" transform="rotate(288)"/>
+        <ellipse cx="0" cy="-52" rx="8" ry="11" fill="#FF8A65" transform="rotate(306)"/>
+        <ellipse cx="0" cy="-52" rx="9" ry="13" fill="#A5D6A7" transform="rotate(324)"/>
+        <ellipse cx="0" cy="-52" rx="7" ry="10" fill="#CE93D8" transform="rotate(342)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="9" fill="#558B2F" transform="rotate(9)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="8" fill="#AED581" transform="rotate(45)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="9" fill="#E8613A" transform="rotate(81)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="8" fill="#7B5EA7" transform="rotate(117)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="9" fill="#4CAF50" transform="rotate(153)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="8" fill="#DCE775" transform="rotate(189)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="9" fill="#F4A261" transform="rotate(225)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="8" fill="#81C784" transform="rotate(261)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="9" fill="#CE93D8" transform="rotate(297)"/>
+        <ellipse cx="0" cy="-30" rx="6" ry="8" fill="#8BC34A" transform="rotate(333)"/>
+      </g>
+    </svg>
+    <div class="home-brand">VITALY</div>
+    <div class="home-sub">Espace de commande</div>
+  </div>
+  <div class="hcard">
+    <div class="section-lbl">Sélectionnez votre espace</div>
+    <div class="prow">
+      <button class="pbtn" onclick="goPin('chef','Espace Chef')">
+        <div class="pbic pbic-chef">👨‍🍳</div>
+        <div><div class="pbn">CHEF</div><div class="pbd">LABO & Catalogue</div></div>
+      </button>
+      <button class="pbtn" onclick="goPin('manager','Espace Manager')">
+        <div class="pbic pbic-mgr">📊</div>
+        <div><div class="pbn">MANAGER</div><div class="pbd">Fournisseurs</div></div>
+      </button>
+    </div>
+    <hr class="hdiv">
+    <div class="slbl2">Points de vente</div>
+    <div class="sgrid">
+      <button class="sbtn" onclick="goPin('LePort','Le Port')"><div class="sbic">LP</div><div><div class="sbn">LE PORT</div><div class="sbh">Code 4 chiffres</div></div><span class="sblk">🔒</span></button>
+      <button class="sbtn" onclick="goPin('SacreCoeur','Sacré Coeur')"><div class="sbic">SC</div><div><div class="sbn">SACRÉ COEUR</div><div class="sbh">Code 4 chiffres</div></div><span class="sblk">🔒</span></button>
+      <button class="sbtn" onclick="goPin('Portail','Portail')"><div class="sbic">PT</div><div><div class="sbn">PORTAIL</div><div class="sbh">Code 4 chiffres</div></div><span class="sblk">🔒</span></button>
+      <button class="sbtn" onclick="goPin('Savannah','Savannah')"><div class="sbic">SV</div><div><div class="sbn">SAVANNAH</div><div class="sbh">Code 4 chiffres</div></div><span class="sblk">🔒</span></button>
+      <button class="sbtn sfull" onclick="goPin('ZAC2000','ZAC 2000')"><div class="sbic">ZAC</div><div><div class="sbn">ZAC 2000</div><div class="sbh">Code 4 chiffres</div></div><span class="sblk">🔒</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN -->
+<div id="sp" class="screen">
+  <div class="pcard">
+    <div class="pt" id="pin-title">—</div>
+    <div class="pbadge" id="pin-badge">—</div>
+    <div class="phint">ENTREZ VOTRE CODE</div>
+    <div class="pdots" id="pdots"><div class="pdot"></div><div class="pdot"></div><div class="pdot"></div><div class="pdot"></div></div>
+    <div class="perr" id="perr"></div>
+    <div class="pgrid">
+      <button class="pkey" onclick="pk('1')">1</button><button class="pkey" onclick="pk('2')">2</button><button class="pkey" onclick="pk('3')">3</button>
+      <button class="pkey" onclick="pk('4')">4</button><button class="pkey" onclick="pk('5')">5</button><button class="pkey" onclick="pk('6')">6</button>
+      <button class="pkey" onclick="pk('7')">7</button><button class="pkey" onclick="pk('8')">8</button><button class="pkey" onclick="pk('9')">9</button>
+      <button class="pkey"></button><button class="pkey" onclick="pk('0')">0</button><button class="pkey del" onclick="pdel()">⌫</button>
+    </div>
+    <button class="pback" onclick="show('sh')">← Retour</button>
+  </div>
+</div>
+
+<!-- PDV -->
+<div id="ss" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="tryLeave()">← Quitter</button>
+    <div class="hdr-center"><div class="hdr-lbl">COMMANDE</div><div class="hdr-val" id="ss-badge">—</div></div>
+    <div class="hdr-badge" id="ss-date-badge">—</div>
+  </div>
+  <div class="tabs" id="ss-tabs"></div>
+  <div id="ss-tcs" style="flex:1;overflow-y:auto;"></div>
+  <div class="pdv-footer">
+    <div class="footer-sum" id="ss-sum">0 article sélectionné</div>
+    <button class="send-btn" id="send-btn" onclick="openConfirm()">Envoyer la commande →</button>
+  </div>
+</div>
+
+<!-- CHEF -->
+<div id="sc" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="show('sh')">← Quitter</button>
+    <div class="hdr-center"><div class="hdr-val">ESPACE CHEF</div></div>
+    <div class="hdr-badge">👨‍🍳 Chef</div>
+  </div>
+  <div class="tabs" id="sc-tabs"></div>
+  <div id="sc-tcs" style="flex:1;overflow-y:auto;padding:10px;"></div>
+</div>
+
+<!-- MANAGER -->
+<div id="sm" class="screen">
+  <div class="hdr">
+    <button class="hdr-back" onclick="show('sh')">← Quitter</button>
+    <div class="hdr-center"><div class="hdr-val">ESPACE MANAGER</div></div>
+    <div class="hdr-badge">📊 Manager</div>
+  </div>
+  <div class="tabs" id="sm-tabs"></div>
+  <div id="sm-tcs" style="flex:1;overflow-y:auto;"></div>
+</div>
+
+<!-- SUCCESS -->
+<div id="ssucc" class="screen">
+  <div class="succ-ic" id="succ-ic">✅</div>
+  <div class="succ-t" id="succ-t">—</div>
+  <div class="succ-s" id="succ-s">—</div>
+  <button class="succ-btn" id="succ-back">← Retour</button>
+</div>
+
+<script>
+const PINS={chef:'2121',manager:'2222',LePort:'2626',SacreCoeur:'2323',Portail:'2424',Savannah:'2727',ZAC2000:'2525'};
+const STORE_KEYS=['LePort','SacreCoeur','Portail','Savannah','ZAC2000'];
+const STORE_NAMES={LePort:'Le Port',SacreCoeur:'Sacré Coeur',Portail:'Portail',Savannah:'Savannah',ZAC2000:'ZAC 2000'};
+const PDV_CATS=['LABO','PRO A PRO','PACKAGING','HYGIENE','BOISSON','BIO IMPORT','FL','AUTRES'];
+const PDV_CAT_LABELS={'LABO':'LABO','PRO A PRO':'PRO A PRO','PACKAGING':'PACKAGING','HYGIENE':'HYGIÈNE','BOISSON':'BOISSON','BIO IMPORT':'BIO IMPORT','FL':'F&L','AUTRES':'AUTRES'};
+const MGR_CATS=['PRO A PRO','PACKAGING','HYGIENE','BOISSON','BIO IMPORT','FL','AUTRES'];
+const MGR_CAT_LABELS={'PRO A PRO':'PRO A PRO','PACKAGING':'PACKAGING','HYGIENE':'HYGIÈNE','BOISSON':'BOISSON','BIO IMPORT':'BIO IMPORT','FL':'F&L','AUTRES':'AUTRES'};
+const livraisonCounters={};
+function nextBLNum(sk){if(!livraisonCounters[sk])livraisonCounters[sk]=0;livraisonCounters[sk]++;const d=new Date();return 'BL-'+sk.slice(0,2).toUpperCase()+'-'+String(d.getFullYear()).slice(-2)+String(d.getMonth()+1).padStart(2,'0')+'-'+String(livraisonCounters[sk]).padStart(3,'0');}
+function catDest(cat){return cat==='LABO'?'chef':'manager';}
+
+const PRODUCTS={
+'LABO':[
+{sub:'4e gammes',name:'Salade',unit:'poche'},{sub:'Féculent',name:'Pâtes',unit:'poche'},{sub:'Féculent',name:'Quinoa',unit:'poche'},
+{sub:'4e gammes',name:'Carotte rapée',unit:'poche'},{sub:'4e gammes',name:'Concombre ébouté',unit:'poche'},{sub:'4e gammes',name:'Bady concombre',unit:'poche'},{sub:'4e gammes',name:'Oignon cube',unit:'poche'},{sub:'4e gammes',name:'Tomate entière',unit:'poche'},{sub:'4e gammes',name:'Tomate cerise',unit:'poche'},{sub:'4e gammes',name:'Champignon de paris',unit:'poche'},
+{sub:'Légumes cuisinés',name:'Brocolis grillés',unit:'poche'},{sub:'Légumes cuisinés',name:'Coleslaw',unit:'poche'},{sub:'Légumes cuisinés',name:'Patate douce rôti',unit:'poche'},{sub:'Légumes cuisinés',name:'Aubergine grillée',unit:'poche'},{sub:'Légumes cuisinés',name:'Sauté de légume',unit:'poche'},{sub:'Légumes cuisinés',name:'Butternut rôti',unit:'poche'},{sub:'Légumes cuisinés',name:'Carotte rôti miel Paprika',unit:'poche'},{sub:'Légumes cuisinés',name:'Haricot vert au beurre',unit:'poche'},{sub:'Légumes cuisinés',name:'Pomme de terre rôti',unit:'poche'},
+{sub:'Viande',name:'Jambon',unit:'poche'},
+{sub:'Dressing poulet',name:'Citron herbes ail',unit:'poche'},{sub:'Dressing poulet',name:'Chimichurri',unit:'poche'},{sub:'Dressing poulet',name:'Teriyaki sésame',unit:'poche'},{sub:'Dressing poulet',name:'Curry',unit:'poche'},
+{sub:'Dressing thon',name:'Méditerranéen',unit:'poche'},{sub:'Dressing thon',name:'Teriyaki sésame',unit:'poche'},{sub:'Dressing thon',name:'Citron',unit:'poche'},{sub:'Dressing thon',name:'Curry mangue',unit:'poche'},
+{sub:'Vinaigrette',name:'Balsamique',unit:'poche'},{sub:'Vinaigrette',name:'Moutarde miel',unit:'poche'},{sub:'Vinaigrette',name:'Moutarde basilic',unit:'poche'},{sub:'Vinaigrette',name:'Basilic miel gingembre',unit:'poche'},{sub:'Vinaigrette',name:'Citron ail',unit:'poche'},{sub:'Vinaigrette',name:'Dakatine',unit:'poche'},{sub:'Vinaigrette',name:'Créole',unit:'poche'},{sub:'Vinaigrette',name:'César',unit:'poche'},{sub:'Vinaigrette',name:'Citron miel gingembre',unit:'poche'},{sub:'Vinaigrette',name:"L'avocat",unit:'poche'},{sub:'Vinaigrette',name:'Chinoise',unit:'poche'},{sub:'Vinaigrette',name:'Vinaigrette aux herbes',unit:'poche'},{sub:'Vinaigrette',name:'Italienne Origan Citron',unit:'poche'},{sub:'Vinaigrette',name:'Passion gingembre',unit:'poche'},{sub:'Vinaigrette',name:'Letchi Combava',unit:'poche'},
+{sub:'Dessert',name:'Cheesecake (110g)',unit:'pc'},{sub:'Dessert',name:'Mousse chocolat (100g)',unit:'pc'},{sub:'Dessert',name:'Panna cotta (130g)',unit:'pc'},{sub:'Dessert',name:'Tiramisu (100g)',unit:'pc'},{sub:'Dessert',name:'Pudding de chia (135g)',unit:'pc'},{sub:'Dessert',name:'Overnight oats',unit:'pc'},{sub:'Dessert',name:'Compote granola',unit:'pc'},{sub:'Dessert',name:'Cookies',unit:'pc'},
+{sub:'Boisson',name:'Citron & chia',unit:'pc'},{sub:'Boisson',name:'Citronnade miel gingembre',unit:'pc'},{sub:'Boisson',name:'Hibiscus Fruits Rouges',unit:'pc'},{sub:'Boisson',name:'Matcha lemon fizz',unit:'pc'}
+],
+'PRO A PRO':[
+{sub:'Eaux',name:'Packs Edena 1l',unit:'pack'},{sub:'Eaux',name:'Packs Cristaline 50cl',unit:'pack'},{sub:'Eaux',name:'Packs Volcanik 50cl',unit:'pack'},{sub:'Eaux',name:'Packs Cilaos 50cl',unit:'pack'},
+{sub:'Frais',name:'Sachets Emmental cubes',unit:'sachet'},{sub:'Frais',name:'Feta cubes',unit:'kg'},{sub:'Frais',name:'Parmesan copeaux',unit:'paquet'},{sub:'Frais',name:'Fromage blanc',unit:'pot'},{sub:'Frais',name:'Crème liquide 35%',unit:'litre'},{sub:'Frais',name:'Pesto',unit:'kg'},{sub:'Frais',name:'Coulis fraise Ponthier',unit:'kg'},{sub:'Frais',name:'Coulis fruit rouge Ponthier',unit:'kg'},{sub:'Frais',name:'Coulis mangue Ponthier',unit:'kg'},{sub:'Frais',name:'Coulis passion Ponthier',unit:'kg'},{sub:'Frais',name:'Coulis banane Ponthier',unit:'kg'},{sub:'Frais',name:'Mozza 2,5kg',unit:'sachet'},{sub:'Frais',name:'Poulet tranchette rôti',unit:'sachet'},{sub:'Frais',name:'Bleu 500g',unit:'boîte'},{sub:'Frais',name:'Tranche de saumon',unit:'kg'},{sub:'Frais',name:'Avocats',unit:'kg'},
+{sub:'Surgelés',name:'Wakame',unit:'kg'},{sub:'Surgelés',name:'Edamame',unit:'kg'},{sub:'Surgelés',name:'Mangue',unit:'kg'},{sub:'Surgelés',name:'Fraises entières',unit:'kg'},{sub:'Surgelés',name:'Framboise',unit:'kg'},
+{sub:'Épicerie',name:"Crouton à l'ail",unit:'sachet'},{sub:'Épicerie',name:'Oignons frits',unit:'sachet'},{sub:'Épicerie',name:'Maïs 3/1',unit:'boîte'},{sub:'Épicerie',name:'Olives vertes dénoyautées 5/1',unit:'boîte'},{sub:'Épicerie',name:'Lait de coco 1l',unit:'brique'},{sub:'Épicerie',name:'Oignons confits',unit:'pot'},{sub:'Épicerie',name:'Tomates séchées',unit:'sachet'},{sub:'Épicerie',name:"Huile d'olive",unit:'L'},{sub:'Épicerie',name:'Gingembre mariné',unit:'kg'},{sub:'Épicerie',name:'Persil',unit:'kg'},{sub:'Épicerie',name:'Basilic',unit:'kg'},{sub:'Épicerie',name:'Thon nature 600g',unit:'poche'},{sub:'Épicerie',name:'Pois chiche 4/4',unit:'boîte'},{sub:'Épicerie',name:'Muesli',unit:'boîte'},{sub:'Épicerie',name:'Herbes de Provence',unit:'paquet'},{sub:'Épicerie',name:'Poivron metro',unit:'boîte'},{sub:'Épicerie',name:'Spéculos/Oréo',unit:'sachet'},{sub:'Épicerie',name:'Dosette sel',unit:'boîte'},{sub:'Épicerie',name:'Dosette poivre',unit:'boîte'},{sub:'Épicerie',name:"Flocon d'avoine",unit:'sachet'},{sub:'Épicerie',name:"Cœurs d'artichauts 4/4",unit:'boîte'},{sub:'Épicerie',name:'Sauce Soja',unit:'pc'},{sub:'Épicerie',name:'Curry',unit:'paquet'},{sub:'Épicerie',name:'Copeaux Chocolat blanc',unit:'paquet'},{sub:'Épicerie',name:'Miel 1kg',unit:'kg'},{sub:'Épicerie',name:'Kebab',unit:'paquet'}
+],
+'PACKAGING':[{sub:'Emballage',name:'Bol Bagasse',unit:'pc'},{sub:'Emballage',name:'Kit couvert',unit:'pc'},{sub:'Emballage',name:'Sac à pain',unit:'pc'},{sub:'Emballage',name:'Pot sauce T2',unit:'pc'},{sub:'Emballage',name:'Gobelet café 20cl',unit:'pc'},{sub:'Emballage',name:'Gobelet café 10cl',unit:'pc'},{sub:'Emballage',name:'Serviette blanche',unit:'pc'},{sub:'Emballage',name:'Boîte Wraps',unit:'pc'},{sub:'Emballage',name:'Pot sauce wrap',unit:'pc'},{sub:'Emballage',name:'Pot + Couvercle dessert',unit:'pc'},{sub:'Emballage',name:'Cuillère dessert',unit:'pc'},{sub:'Emballage',name:'Sac Kraft',unit:'pc'},{sub:'Emballage',name:'Paille 6mm',unit:'pc'},{sub:'Emballage',name:'Touillettes',unit:'pc'},{sub:'Emballage',name:'Gobelet + Couvercle jus',unit:'pc'}],
+'HYGIENE':[{sub:'Hygiène',name:'Sac Poubelle P',unit:'rouleau'},{sub:'Hygiène',name:'Sac Poubelle G',unit:'rouleau'},{sub:'Hygiène',name:'Liquide vaisselle',unit:'L'},{sub:'Hygiène',name:'Produit Sol',unit:'L'},{sub:'Hygiène',name:'Produit Vitre',unit:'L'},{sub:'Hygiène',name:'Paquet Sopalin',unit:'paquet'},{sub:'Hygiène',name:'Frange serpillère',unit:'pc'},{sub:'Hygiène',name:'Lavette micro B R J O V',unit:'pc'},{sub:'Hygiène',name:'Désinfectant spray',unit:'pc'},{sub:'Hygiène',name:'Savon main',unit:'L'},{sub:'Hygiène',name:'Gel hydro',unit:'L'},{sub:'Hygiène',name:'Éponge',unit:'pc'},{sub:'Hygiène',name:'Cif',unit:'pc'},{sub:'Hygiène',name:'Boîte de Gant',unit:'boîte'},{sub:'Hygiène',name:'Pastille lave-vaisselle',unit:'boîte'},{sub:'Hygiène',name:'Rinçage lave-vaisselle',unit:'L'},{sub:'Hygiène',name:'Détartrant lave-vaisselle',unit:'L'}],
+'BOISSON':[{sub:'Jomo',name:'Jomo menthe-citron',unit:'pc'},{sub:'Jomo',name:'Jomo pêche-hibiscus',unit:'pc'},{sub:'Jomo',name:'Jomo grenade-litchi',unit:'pc'},{sub:'Jomo',name:'Jomo passion-citron',unit:'pc'},{sub:'Galvanina',name:'Galvanina citron',unit:'pc'},{sub:'Galvanina',name:'Galvanina PG',unit:'pc'},{sub:'Flirt',name:'Flirt PAM',unit:'pc'},{sub:'Flirt',name:'Flirt grenade-citron-vert',unit:'pc'},{sub:'Flirt',name:'Flirt pêche-hibiscus',unit:'pc'},{sub:'Autre',name:'Eau de coco',unit:'pc'},{sub:'Autre',name:'Café intense',unit:'pc'},{sub:'Autre',name:'Café léger',unit:'pc'},{sub:'Autre',name:'Café déca',unit:'pc'}],
+'BIO IMPORT':[{sub:'Fruits secs & graines',name:'Noix en morceaux',unit:'kg'},{sub:'Fruits secs & graines',name:'Cranberries',unit:'kg'},{sub:'Fruits secs & graines',name:'Noix de cajou',unit:'kg'},{sub:'Fruits secs & graines',name:'Cacahuète',unit:'kg'},{sub:'Fruits secs & graines',name:'Tournesol',unit:'kg'},{sub:'Fruits secs & graines',name:'Sésame',unit:'kg'},{sub:'Fruits secs & graines',name:'Courge',unit:'kg'},{sub:'Fruits secs & graines',name:'Chia',unit:'kg'},{sub:'Fruits secs & graines',name:'Raisin sec',unit:'kg'},{sub:'Fruits secs & graines',name:'Banana chips',unit:'kg'},{sub:'Fruits secs & graines',name:'Ananas séché',unit:'kg'},{sub:'Fruits secs & graines',name:'Pistache vert',unit:'kg'}],
+'FL':[{sub:'Légumes',name:'Laitue 500g',unit:'poche'},{sub:'Légumes',name:'Tomate 1kg',unit:'poche'},{sub:'Légumes',name:'Concombre 1kg',unit:'poche'},{sub:'Légumes',name:'Oignon 1kg',unit:'poche'},{sub:'Légumes',name:'Carotte 1kg',unit:'poche'},{sub:'Légumes',name:'Courgette 1kg',unit:'poche'},{sub:'Fruits',name:'Ananas 1kg',unit:'poche'},{sub:'Fruits',name:'Ananas (brut)',unit:'pc'},{sub:'Fruits',name:'Pomme (brut)',unit:'pc'},{sub:'Fruits',name:'Melon (brut)',unit:'pc'}],
+'AUTRES':[{sub:'Fourniture',name:'Agraphe',unit:'boîte'},{sub:'Fourniture',name:'Feutre veleda',unit:'pc'},{sub:'Fourniture',name:'Feutre permanent',unit:'pc'},{sub:'Fourniture',name:'Stylo',unit:'pc'},{sub:'Fourniture',name:'Rouleaux CB',unit:'rouleau'},{sub:'Fourniture',name:'Rouleaux Ticket',unit:'rouleau'},{sub:'Fourniture',name:'Rouleaux Étiquette DLC',unit:'rouleau'},{sub:'Fourniture',name:'Film étirable transparent',unit:'rouleau'},{sub:'Fourniture',name:'Trousse pharmacie',unit:'pc'}]
+};
+
+// State
+let st={profile:'',storeKey:'',pin:'',quantities:{},stocks:{},checked:{},deliveryDate:''};
+const db={chef:[],manager:[],chefHistory:[],managerHistory:[],stocks:[],catalogue:{}};
+let editKey='',editTmpQty=0;
+let lastSeenChef=0,lastSeenMgr=0;
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function fmtDate(){const d=new Date();const days=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];const months=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];return days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();}
+function fmtShort(){return new Date().toLocaleDateString('fr-FR');}
+function fmtTime(){return new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
+function safeId(s){return s.replace(/[^a-zA-Z0-9]/g,'_');}
+function getSubs(cat){const o=[];(PRODUCTS[cat]||[]).forEach(p=>{if(!o.includes(p.sub))o.push(p.sub);});return o;}
+function hasSingleSub(cat){return new Set((PRODUCTS[cat]||[]).map(p=>p.sub)).size===1;}
+function tomorrowDate(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0];}
+function isProdAvailable(cat,i){
+  const key=cat+'__'+i;
+  if(cat!=='LABO')return true;
+  if(Object.keys(db.catalogue).length===0)return true;
+  return db.catalogue[key]!==false;
+}
+
+// Firebase
+function initFirebaseListeners(){
+  const {collection,onSnapshot,query,orderBy,doc}=window.fsLib;
+  const fdb=window.firestoreDB;
+  onSnapshot(query(collection(fdb,'chef_orders'),orderBy('timestamp','desc')),snap=>{
+    db.chef=snap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>!o.treated);
+    updateBadges();
+  });
+  onSnapshot(query(collection(fdb,'manager_orders'),orderBy('timestamp','desc')),snap=>{
+    db.manager=snap.docs.map(d=>({id:d.id,...d.data()})).filter(o=>!o.treated);
+    updateBadges();
+  });
+  onSnapshot(query(collection(fdb,'chef_history'),orderBy('treatedAt','desc')),snap=>{db.chefHistory=snap.docs.map(d=>({id:d.id,...d.data()}));});
+  onSnapshot(query(collection(fdb,'manager_history'),orderBy('treatedAt','desc')),snap=>{db.managerHistory=snap.docs.map(d=>({id:d.id,...d.data()}));});
+  onSnapshot(collection(fdb,'stocks'),snap=>{db.stocks=snap.docs.map(d=>({id:d.id,...d.data()}));});
+  onSnapshot(doc(fdb,'catalogue','labo'),snap=>{
+    if(snap.exists())db.catalogue=snap.data();
+    else db.catalogue={};
+  });
+  document.getElementById('loading').style.display='none';
+  show('sh');
+}
+if(window.firebaseReady)initFirebaseListeners();
+else document.addEventListener('firebaseReady',initFirebaseListeners);
+
+function updateBadges(){
+  // Update tab badges if chef/manager space open
+  const chefNew=db.chef.filter(o=>o.timestamp>lastSeenChef).length;
+  const mgrNew=db.manager.filter(o=>o.timestamp>lastSeenMgr).length;
+  // Store counts for when spaces open
+  window._chefNewCount=chefNew;
+  window._mgrNewCount=mgrNew;
+}
+
+async function saveOrder(dest,entry){
+  entry.timestamp=Date.now();
+  await window.fsLib.addDoc(window.fsLib.collection(window.firestoreDB,dest==='chef'?'chef_orders':'manager_orders'),entry);
+}
+async function saveStock(entry){
+  entry.timestamp=Date.now();
+  await window.fsLib.setDoc(window.fsLib.doc(window.firestoreDB,'stocks',entry.storeKey),entry);
+}
+async function saveCatalogue(catalogue){
+  await window.fsLib.setDoc(window.fsLib.doc(window.firestoreDB,'catalogue','labo'),catalogue);
+}
+async function markTreated(orderId,dest){
+  const fdb=window.firestoreDB;
+  const colName=dest==='chef'?'chef_orders':'manager_orders';
+  const histColName=dest==='chef'?'chef_history':'manager_history';
+  const order=dest==='chef'?db.chef.find(o=>o.id===orderId):db.manager.find(o=>o.id===orderId);
+  if(!order)return;
+  const {addDoc,collection,updateDoc,doc}=window.fsLib;
+  await addDoc(collection(fdb,histColName),{...order,treatedAt:Date.now(),treatedDate:fmtShort(),treatedTime:fmtTime()});
+  await updateDoc(doc(fdb,colName,orderId),{treated:true,treatedAt:Date.now()});
+}
+async function updateOrderQty(orderId,dest,quantities){
+  const {doc,updateDoc}=window.fsLib;
+  const colName=dest==='chef'?'chef_orders':'manager_orders';
+  await updateDoc(window.fsLib.doc(window.firestoreDB,colName,orderId),{quantities});
+}
+
+// Warn
+function tryLeave(){
+  const total=Object.values(st.quantities).reduce((a,b)=>a+b,0);
+  const hasChecked=Object.values(st.checked).some(v=>v);
+  if(total>0||hasChecked)document.getElementById('warn-overlay').classList.add('open');
+  else show('sh');
+}
+function closeWarn(){document.getElementById('warn-overlay').classList.remove('open');}
+function forceLeave(){closeWarn();st.quantities={};st.stocks={};st.checked={};show('sh');}
+
+// PIN
+function goPin(profile,label){
+  st.profile=profile;st.pin='';
+  document.getElementById('pin-title').textContent=label.toUpperCase();
+  document.getElementById('pin-badge').textContent=STORE_KEYS.includes(profile)?'Point de vente':label;
+  document.querySelectorAll('.pdot').forEach(d=>d.classList.remove('filled'));
+  document.getElementById('perr').textContent='';
+  show('sp');
+}
+function pk(n){
+  if(!n||st.pin.length>=4)return;st.pin+=n;
+  document.querySelectorAll('.pdot').forEach((d,i)=>d.classList.toggle('filled',i<st.pin.length));
+  document.getElementById('perr').textContent='';
+  if(st.pin.length===4)setTimeout(checkPin,200);
+}
+function pdel(){st.pin=st.pin.slice(0,-1);document.querySelectorAll('.pdot').forEach((d,i)=>d.classList.toggle('filled',i<st.pin.length));}
+function checkPin(){
+  if(st.pin===PINS[st.profile]){
+    if(st.profile==='chef')openChef();
+    else if(st.profile==='manager'){lastSeenMgr=Date.now();openManager();}
+    else{st.storeKey=st.profile;openStore();}
+  }else{
+    document.getElementById('perr').textContent='Code incorrect. Réessayez.';
+    st.pin='';document.querySelectorAll('.pdot').forEach(d=>d.classList.remove('filled'));
+  }
+}
+
+// PDV
+function openStore(){
+  st.quantities={};st.stocks={};st.checked={};
+  st.deliveryDate=tomorrowDate();
+  document.getElementById('ss-badge').textContent=STORE_NAMES[st.storeKey];
+  document.getElementById('ss-date-badge').textContent=fmtDate().split(' ').slice(0,2).join(' ');
+  buildPdvTabs();
+  show('ss');
+}
+
+function buildPdvTabs(){
+  const tabsEl=document.getElementById('ss-tabs');
+  const tcsEl=document.getElementById('ss-tcs');
+  tabsEl.innerHTML='';tcsEl.innerHTML='';
+  PDV_CATS.forEach((cat,ci)=>{
+    const label=PDV_CAT_LABELS[cat];
+    const dest=catDest(cat);
+    const btn=document.createElement('button');
+    btn.className='tab'+(ci===0?' active':'');
+    btn.innerHTML=label+'<span style="display:inline-block;width:5px;height:5px;border-radius:50%;margin-left:5px;vertical-align:middle;background:'+(dest==='chef'?'var(--g)':'var(--pu)')+'"></span>';
+    btn.onclick=(c=>()=>{
+      document.querySelectorAll('#ss-tabs .tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('#ss-tcs .tc').forEach(t=>t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('pdvtc_'+safeId(c)).classList.add('active');
+      updateFooter();
+    })(cat);
+    tabsEl.appendChild(btn);
+    const tc=document.createElement('div');
+    tc.className='tc'+(ci===0?' active':'');
+    tc.id='pdvtc_'+safeId(cat);
+    tc.style.overflowY='auto';
+    // date bar
+    const dateDiv=document.createElement('div');
+    dateDiv.className='pdv-body';
+    dateDiv.style.paddingBottom='0';
+    const dateBar=document.createElement('div');
+    dateBar.className='date-bar';
+    dateBar.innerHTML='<label>Livraison souhaitée :</label>';
+    const dateInp=document.createElement('input');
+    dateInp.type='date';dateInp.className='date-inp';dateInp.value=st.deliveryDate;
+    dateInp.addEventListener('change',()=>{st.deliveryDate=dateInp.value;syncDates();});
+    dateBar.appendChild(dateInp);
+    const routeDiv=document.createElement('div');
+    routeDiv.className='route-info '+(dest==='chef'?'route-chef':'route-mgr');
+    routeDiv.textContent=dest==='chef'?'Commande envoyée au Chef — LABO':'Commande envoyée au Manager — Fournisseurs';
+    dateDiv.appendChild(dateBar);
+    dateDiv.appendChild(routeDiv);
+    tc.appendChild(dateDiv);
+    const body=document.createElement('div');
+    body.className='pdv-body';
+    body.style.paddingTop='4px';
+    const prods=PRODUCTS[cat]||[];
+    const subs={};
+    prods.forEach((p,i)=>{if(!subs[p.sub])subs[p.sub]=[];subs[p.sub].push({p,i});});
+    Object.keys(subs).forEach(sub=>{
+      const stEl=document.createElement('div');stEl.className='sub-title';stEl.textContent=sub.toUpperCase();body.appendChild(stEl);
+      const list=document.createElement('div');list.className='prod-list';
+      subs[sub].forEach(({p,i})=>{
+        const key=cat+'__'+i;
+        const avail=isProdAvailable(cat,i);
+        const row=document.createElement('div');
+        row.className='prod-row'+(avail?'':' unavailable');
+        const existingStock=st.stocks[key]||0;
+        // Check
+        const chkEl=document.createElement('div');
+        chkEl.className='prod-check';chkEl.id='chk_'+safeId(key);
+        chkEl.addEventListener('click',()=>toggleCheck(key));
+        // Info
+        const infoEl=document.createElement('div');infoEl.className='prod-info';
+        const nameEl=document.createElement('div');nameEl.className='prod-name';nameEl.textContent=p.name;
+        const metaEl=document.createElement('div');metaEl.style.cssText='display:flex;align-items:center;gap:6px;margin-top:3px';
+        const unitEl=document.createElement('span');unitEl.className='prod-unit';unitEl.textContent=p.unit;
+        const stkWrap=document.createElement('div');stkWrap.style.cssText='display:flex;align-items:center;gap:2px;background:rgba(136,135,128,.1);border-radius:5px;padding:2px 5px;';
+        const stkLbl=document.createElement('span');stkLbl.style.cssText='font-size:9px;color:var(--gr);';stkLbl.textContent='Stk:';
+        const stkMBtn=document.createElement('button');stkMBtn.type='button';stkMBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:15px;color:var(--gr);padding:0 3px;line-height:1;';stkMBtn.textContent='−';
+        stkMBtn.addEventListener('click',(e)=>{e.stopPropagation();chgStk(key,-1);});
+        const stkVal=document.createElement('span');stkVal.id='stk_'+safeId(key);stkVal.style.cssText='font-size:12px;font-weight:700;color:var(--g);min-width:20px;text-align:center;';stkVal.textContent=existingStock;
+        const stkPBtn=document.createElement('button');stkPBtn.type='button';stkPBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:15px;color:var(--g);padding:0 3px;line-height:1;';stkPBtn.textContent='+';
+        stkPBtn.addEventListener('click',(e)=>{e.stopPropagation();chgStk(key,1);});
+        stkWrap.appendChild(stkLbl);stkWrap.appendChild(stkMBtn);stkWrap.appendChild(stkVal);stkWrap.appendChild(stkPBtn);
+        metaEl.appendChild(unitEl);metaEl.appendChild(stkWrap);
+        infoEl.appendChild(nameEl);infoEl.appendChild(metaEl);
+        // Qty
+        const qtyRowEl=document.createElement('div');qtyRowEl.className='prod-qty-row';
+        const qmBtn=document.createElement('button');qmBtn.type='button';qmBtn.className='qm';qmBtn.textContent='−';
+        qmBtn.addEventListener('click',()=>chg(key,-1));
+        const qvEl=document.createElement('span');qvEl.className='qv';qvEl.id='qv_'+safeId(key);qvEl.textContent='0';
+        const qpBtn=document.createElement('button');qpBtn.type='button';qpBtn.className='qp';qpBtn.textContent='+';
+        qpBtn.addEventListener('click',()=>chg(key,1));
+        qtyRowEl.appendChild(qmBtn);qtyRowEl.appendChild(qvEl);qtyRowEl.appendChild(qpBtn);
+        row.appendChild(chkEl);row.appendChild(infoEl);row.appendChild(qtyRowEl);
+        list.appendChild(row);
+      });
+      body.appendChild(list);
+    });
+    tc.appendChild(body);
+    tcsEl.appendChild(tc);
+  });
+  updateFooter();
+}
+
+function syncDates(){
+  document.querySelectorAll('.date-inp').forEach(inp=>{inp.value=st.deliveryDate;});
+}
+function toggleCheck(key){
+  st.checked[key]=!st.checked[key];
+  const el=document.getElementById('chk_'+safeId(key));
+  if(el)el.classList.toggle('checked',!!st.checked[key]);
+}
+function chg(key,d){
+  st.quantities[key]=Math.max(0,(st.quantities[key]||0)+d);
+  const el=document.getElementById('qv_'+safeId(key));if(el)el.textContent=st.quantities[key];
+  if(st.quantities[key]>0&&!st.checked[key])toggleCheck(key);
+  if(st.quantities[key]===0&&st.checked[key])toggleCheck(key);
+  updateFooter();
+}
+function chgStk(key,d){
+  st.stocks[key]=Math.max(0,(st.stocks[key]||0)+d);
+  const el=document.getElementById('stk_'+safeId(key));if(el)el.textContent=st.stocks[key];
+}
+function updateFooter(){
+  const total=Object.values(st.quantities).reduce((a,b)=>a+b,0);
+  const chefT=Object.keys(st.quantities).filter(k=>catDest(k.split('__')[0])==='chef'&&st.quantities[k]>0).reduce((a,k)=>a+st.quantities[k],0);
+  const mgrT=Object.keys(st.quantities).filter(k=>catDest(k.split('__')[0])==='manager'&&st.quantities[k]>0).reduce((a,k)=>a+st.quantities[k],0);
+  document.getElementById('ss-sum').innerHTML='<strong>'+total+'</strong> article(s) — Chef: <strong>'+chefT+'</strong> · Manager: <strong>'+mgrT+'</strong>';
+  document.getElementById('send-btn').disabled=total===0;
+}
+
+// Confirm modal
+function openConfirm(){
+  const total=Object.values(st.quantities).reduce((a,b)=>a+b,0);
+  if(total===0){alert('Aucun article sélectionné.');return;}
+  const chefT=Object.keys(st.quantities).filter(k=>catDest(k.split('__')[0])==='chef'&&st.quantities[k]>0).reduce((a,k)=>a+st.quantities[k],0);
+  const mgrT=Object.keys(st.quantities).filter(k=>catDest(k.split('__')[0])==='manager'&&st.quantities[k]>0).reduce((a,k)=>a+st.quantities[k],0);
+  const parts=[];
+  if(chefT>0)parts.push(chefT+' article(s) → Chef (LABO)');
+  if(mgrT>0)parts.push(mgrT+' article(s) → Manager (Fournisseurs)');
+  document.getElementById('conf-title').textContent='Confirmer — '+STORE_NAMES[st.storeKey];
+  document.getElementById('conf-sub').textContent=parts.join('\n');
+  const dlv=st.deliveryDate?new Date(st.deliveryDate).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}):'Non spécifiée';
+  document.getElementById('conf-date').textContent='Livraison souhaitée : '+dlv;
+  document.getElementById('conf-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('conf-modal').classList.remove('open');document.getElementById('edit-modal').classList.remove('open');}
+async function confirmSend(){
+  closeModal();
+  const sName=STORE_NAMES[st.storeKey];
+  const dlvDate=st.deliveryDate?new Date(st.deliveryDate).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}):fmtShort();
+  const chefQ={},mgrQ={};
+  Object.keys(st.quantities).forEach(key=>{
+    if(!st.quantities[key])return;
+    if(catDest(key.split('__')[0])==='chef')chefQ[key]=st.quantities[key];
+    else mgrQ[key]=st.quantities[key];
+  });
+  try{
+    if(Object.keys(chefQ).length){
+      const cats=[...new Set(Object.keys(chefQ).map(k=>k.split('__')[0]))];
+      await saveOrder('chef',{storeKey:st.storeKey,storeName:sName,date:fmtShort(),time:fmtTime(),deliveryDate:dlvDate,quantities:chefQ,cats});
+    }
+    if(Object.keys(mgrQ).length){
+      const cats=[...new Set(Object.keys(mgrQ).map(k=>k.split('__')[0]))];
+      await saveOrder('manager',{storeKey:st.storeKey,storeName:sName,date:fmtShort(),time:fmtTime(),deliveryDate:dlvDate,quantities:mgrQ,cats});
+    }
+    if(Object.keys(st.stocks).some(k=>st.stocks[k]>0)){
+      await saveStock({storeKey:st.storeKey,storeName:sName,date:fmtShort(),time:fmtTime(),stocks:{...st.stocks}});
+    }
+    const total=Object.values(st.quantities).reduce((a,b)=>a+b,0);
+    document.getElementById('succ-ic').textContent='✅';
+    document.getElementById('succ-t').textContent='Commande envoyée !';
+    document.getElementById('succ-s').textContent=total+' article(s) pour '+sName+'\nLivraison : '+dlvDate+'\nEnvoyée le '+fmtShort()+' à '+fmtTime();
+    document.getElementById('succ-back').onclick=()=>{st.quantities={};st.stocks={};st.checked={};show('ss');};
+    show('ssucc');
+  }catch(e){alert('Erreur : '+e.message);}
+}
+
+// CHEF
+function openChef(){
+  lastSeenChef=Date.now();
+  buildTabs('sc-tabs','sc-tcs',[...STORE_KEYS,'catalogue','stocks_chef','hist_chef'],(sk,tcid)=>{
+    if(sk==='catalogue')renderCatalogue(tcid);
+    else if(sk==='stocks_chef')renderStocks(tcid);
+    else if(sk==='hist_chef')renderHistory(tcid,'chef');
+    else renderChefStore(tcid,sk);
+  },sk=>{
+    if(sk==='catalogue')return 'Catalogue';
+    if(sk==='stocks_chef')return 'Stocks PDV';
+    if(sk==='hist_chef')return 'Historique';
+    const cnt=db.chef.filter(o=>o.storeKey===sk).length;
+    return STORE_NAMES[sk]+(cnt>0?' ('+cnt+')':'');
+  });
+  show('sc');
+}
+
+function renderChefStore(tcid,sk){
+  const tc=document.getElementById(tcid);
+  const orders=db.chef.filter(o=>o.storeKey===sk);
+  if(!orders.length){tc.innerHTML='<div class="empty-st"><div class="empty-ic">📭</div>Aucune commande LABO de '+STORE_NAMES[sk]+'.</div>';return;}
+  let html='';
+  orders.forEach(o=>{
+    const stockEntry=db.stocks.find(s=>s.storeKey===sk);
+    let catHtml='';
+    const grouped={};
+    Object.keys(o.quantities).forEach(key=>{const q=o.quantities[key];if(!q)return;const[cat,idx]=key.split('__');const p=(PRODUCTS[cat]||[])[parseInt(idx)];if(!p)return;if(!grouped[p.sub])grouped[p.sub]=[];grouped[p.sub].push({name:p.name,unit:p.unit,q,key});});
+    Object.keys(grouped).forEach(sub=>{
+      catHtml+='<div class="cat-section"><div class="cat-lbl">'+sub+'</div>';
+      grouped[sub].forEach(item=>{
+        const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[item.key]!=null?stockEntry.stocks[item.key]:'—';
+        catHtml+='<div class="prod-line"><span class="prod-line-stock" style="'+(stk!=='—'?'':'opacity:.3')+'">Stk:'+stk+'</span><span class="prod-line-name">'+item.name+'</span><span class="prod-line-qty">'+item.q+' '+item.unit+'</span></div>';
+      });
+      catHtml+='</div>';
+    });
+    html+='<div class="ocard"><div class="ocard-head"><span class="ocard-store" style="font-size:15px;font-weight:800;">'+o.storeName.toUpperCase()+'</span>'+(o.deliveryDate?'<span class="ocard-livraison">'+o.deliveryDate+'</span>':'')+' <span class="ocard-time">'+o.date+' '+o.time+'</span></div>'+catHtml+'<button class="treat-btn" onclick="treatOrder(\''+o.id+'\',\'chef\',\'sc-tcs_'+safeId(sk)+'\',\''+sk+'\')">✓ Marquer comme traité</button></div>';
+  });
+  html+='<div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">';
+  html+='<button style="flex:1;padding:9px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--g);color:var(--cr);" onclick="genChefPDF(\''+sk+'\',\'bc\')">PDF Bon de commande</button>';
+  html+='<button style="flex:1;padding:9px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--or);color:#fff;" onclick="genChefPDF(\''+sk+'\',\'bl\')">PDF Bon de livraison</button>';
+  html+='</div>';
+  tc.innerHTML=html;
+}
+
+// Catalogue
+function renderCatalogue(tcid){
+  const tc=document.getElementById(tcid);
+  const prods=PRODUCTS['LABO']||[];
+  const subs={};
+  prods.forEach((p,i)=>{if(!subs[p.sub])subs[p.sub]=[];subs[p.sub].push({p,i});});
+  let html='<div style="padding:10px;"><div style="background:rgba(30,92,58,.08);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--g);margin-bottom:12px;">Activez ou désactivez les produits LABO disponibles cette semaine. Seuls les produits actifs apparaîtront dans les commandes des points de vente.</div>';
+  Object.keys(subs).forEach(sub=>{
+    html+='<div class="catalogue-section"><div class="catalogue-section-title">'+sub+'</div>';
+    subs[sub].forEach(({p,i})=>{
+      const key='LABO__'+i;
+      const isOn=db.catalogue[key]!==false;
+      html+='<div class="cat-toggle-row" onclick="toggleCatalogue(\''+key+'\')">';
+      html+='<div class="toggle-switch '+(isOn?'on':'')+'" id="tog_'+safeId(key)+'"></div>';
+      html+='<span class="cat-toggle-name">'+p.name+'</span>';
+      html+='<span class="cat-toggle-sub">'+p.unit+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  tc.innerHTML=html;
+}
+
+async function toggleCatalogue(key){
+  const current=db.catalogue[key]!==false;
+  db.catalogue[key]=!current;
+  const togEl=document.getElementById('tog_'+safeId(key));
+  if(togEl)togEl.classList.toggle('on',!current);
+  await saveCatalogue({...db.catalogue});
+}
+
+// Manager
+function openManager(){
+  lastSeenMgr=Date.now();
+  const tabs=['dashboard',...MGR_CATS,'stocks_mgr','hist_mgr'];
+  buildTabs('sm-tabs','sm-tcs',tabs,(cat,tcid)=>{
+    if(cat==='dashboard')renderDashboard(tcid);
+    else if(cat==='stocks_mgr')renderStocks(tcid);
+    else if(cat==='hist_mgr')renderHistory(tcid,'manager');
+    else renderMgrCat(tcid,cat);
+  },cat=>{
+    if(cat==='dashboard')return 'Tableau de bord';
+    if(cat==='stocks_mgr')return 'Stocks PDV';
+    if(cat==='hist_mgr')return 'Historique';
+    const cnt=db.manager.filter(o=>!o.treated&&o.cats&&o.cats.includes(cat)).length;
+    const label=MGR_CAT_LABELS[cat]||cat;
+    return label+(cnt>0?' ('+cnt+')':'');
+  });
+  show('sm');
+}
+
+function renderDashboard(tcid){
+  const tc=document.getElementById(tcid);
+  const activeOrders=db.manager.filter(o=>!o.treated);
+  const totalArticles=activeOrders.reduce((s,o)=>s+Object.values(o.quantities).reduce((a,b)=>a+b,0),0);
+  const activePDVs=new Set(activeOrders.map(o=>o.storeKey)).size;
+  const activeFournisseurs=new Set(activeOrders.flatMap(o=>o.cats||[])).size;
+  // Per fournisseur totals
+  const fTotals={};
+  MGR_CATS.forEach(cat=>{
+    const prods=PRODUCTS[cat]||[];
+    let total=0;
+    const pdvData={};
+    STORE_KEYS.forEach(sk=>{
+      const skOrders=activeOrders.filter(o=>o.storeKey===sk&&o.cats&&o.cats.includes(cat));
+      const skTotal=skOrders.reduce((s,o)=>prods.reduce((ss,_,i)=>ss+(o.quantities[cat+'__'+i]||0),s),0);
+      total+=skTotal;
+      if(skTotal>0)pdvData[sk]=skTotal;
+    });
+    fTotals[cat]={total,pdvData};
+  });
+  const maxTotal=Math.max(...Object.values(fTotals).map(f=>f.total),1);
+  let html='<div class="dash-section">';
+  // Summary cards
+  html+='<div class="dash-summary">';
+  html+='<div class="dash-card"><div class="dash-card-lbl">Articles en attente</div><div class="dash-card-val">'+totalArticles+'</div><div class="dash-card-sub">cette semaine</div></div>';
+  html+='<div class="dash-card"><div class="dash-card-lbl">PDV actifs</div><div class="dash-card-val">'+activePDVs+'/5</div><div class="dash-card-sub">ont commandé</div></div>';
+  html+='<div class="dash-card"><div class="dash-card-lbl">Fournisseurs</div><div class="dash-card-val">'+activeFournisseurs+'</div><div class="dash-card-sub">avec commandes</div></div>';
+  html+='<div class="dash-card"><div class="dash-card-lbl">Commandes</div><div class="dash-card-val">'+activeOrders.length+'</div><div class="dash-card-sub">en attente traitement</div></div>';
+  html+='</div>';
+  // Fournisseur visual cards
+  html+='<div class="fournisseur-cards">';
+  MGR_CATS.forEach(cat=>{
+    const f=fTotals[cat];
+    const label=MGR_CAT_LABELS[cat]||cat;
+    const pct=Math.round((f.total/maxTotal)*100);
+    const pdvTags=Object.keys(f.pdvData).map(sk=>'<span class="fcrd-pdv">'+STORE_NAMES[sk].replace('Sacré Coeur','SC').replace('ZAC 2000','ZAC')+' '+f.pdvData[sk]+'</span>').join('');
+    const cnt=activeOrders.filter(o=>o.cats&&o.cats.includes(cat)).length;
+    html+='<div class="fcrd">';
+    html+='<div class="fcrd-label">'+label+'</div>';
+    html+='<div class="fcrd-total">'+(f.total||'—')+'</div>';
+    html+='<div class="fcrd-sub">'+Object.keys(f.pdvData).length+' PDV · '+cnt+' commande(s)</div>';
+    if(pdvTags)html+='<div class="fcrd-pdvs">'+pdvTags+'</div>';
+    html+='<div class="fcrd-bar"><div class="fcrd-bar-fill" style="width:'+pct+'%"></div></div>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+  tc.innerHTML=html;
+}
+
+function renderMgrCat(tcid,cat){
+  const tc=document.getElementById(tcid);
+  const prods=PRODUCTS[cat]||[];
+  const activeOrders=db.manager.filter(o=>!o.treated&&o.cats&&o.cats.includes(cat));
+  if(!activeOrders.length){tc.innerHTML='<div class="mgr-body"><div class="mgr-empty"><div style="font-size:36px;margin-bottom:10px;">📭</div>Aucune commande pour '+(MGR_CAT_LABELS[cat]||cat)+'.</div></div>';return;}
+  let html='<div class="mgr-body">';
+  // Show each order individually
+  activeOrders.forEach(o=>{
+    const stockEntry=db.stocks.find(s=>s.storeKey===o.storeKey);
+    const subsOrder=getSubs(cat);const singleSub=hasSingleSub(cat);
+    let cardBody='';
+    if(!singleSub){
+      subsOrder.forEach(sub=>{
+        const subProds=prods.map((p,i)=>({p,i})).filter(({p,i})=>(o.quantities[cat+'__'+i]||0)>0&&p.sub===sub);
+        if(!subProds.length)return;
+        cardBody+='<div class="cat-section"><div class="cat-lbl">'+sub+'</div>';
+        subProds.forEach(({p,i})=>{
+          const q=o.quantities[cat+'__'+i];
+          const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?stockEntry.stocks[cat+'__'+i]:'—';
+          cardBody+='<div class="prod-line"><span class="prod-line-stock" style="'+(stk!=='—'?'':'opacity:.3')+'">Stk:'+stk+'</span><span class="prod-line-name">'+p.name+'</span>';
+          cardBody+='<span class="prod-line-qty"><button class="edit-btn" onclick="openEdit(\''+o.id+'\',\'manager\',\''+cat+'__'+i+'\',\''+p.name+'\',\''+p.unit+'\','+q+')">'+q+'</button> '+p.unit+'</span></div>';
+        });
+        cardBody+='</div>';
+      });
+    }else{
+      prods.forEach((p,i)=>{
+        const q=o.quantities[cat+'__'+i]||0;if(!q)return;
+        const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?stockEntry.stocks[cat+'__'+i]:'—';
+        cardBody+='<div class="prod-line"><span class="prod-line-stock" style="'+(stk!=='—'?'':'opacity:.3')+'">Stk:'+stk+'</span><span class="prod-line-name">'+p.name+'</span>';
+        cardBody+='<span class="prod-line-qty"><button class="edit-btn" onclick="openEdit(\''+o.id+'\',\'manager\',\''+cat+'__'+i+'\',\''+p.name+'\',\''+p.unit+'\','+q+')">'+q+'</button> '+p.unit+'</span></div>';
+      });
+    }
+    html+='<div class="ocard"><div class="ocard-head"><span class="ocard-store" style="font-size:15px;font-weight:800;">'+o.storeName.toUpperCase()+'</span>'+(o.deliveryDate?'<span class="ocard-livraison">'+o.deliveryDate+'</span>':'')+' <span class="ocard-time">'+o.date+' '+o.time+'</span></div>'+cardBody;
+    html+='<button class="treat-btn mgr-treat-btn" onclick="treatOrder(\''+o.id+'\',\'manager\',\'sm-tcs_'+safeId(cat)+'\',\''+cat+'\')">✓ Marquer comme traité</button></div>';
+  });
+  html+='<div style="margin-top:4px;"><button style="width:100%;padding:10px;border-radius:9px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--pu);color:white;" onclick="genMgrPDF(\''+cat+'\')">PDF Bon de commande — '+(MGR_CAT_LABELS[cat]||cat)+'</button></div>';
+  html+='</div>';
+  tc.innerHTML=html;
+}
+
+// Edit qty in manager
+let editOrderId='',editDest='',editQtyKey='';
+function openEdit(orderId,dest,qtyKey,name,unit,currentQty){
+  editOrderId=orderId;editDest=dest;editQtyKey=qtyKey;editTmpQty=currentQty;
+  document.getElementById('edit-prod-name').textContent=name;
+  document.getElementById('edit-prod-unit').textContent=unit;
+  document.getElementById('edit-qv').textContent=currentQty;
+  document.getElementById('edit-modal').classList.add('open');
+}
+function editChg(d){
+  editTmpQty=Math.max(0,editTmpQty+d);
+  document.getElementById('edit-qv').textContent=editTmpQty;
+}
+async function saveEdit(){
+  const order=editDest==='chef'?db.chef.find(o=>o.id===editOrderId):db.manager.find(o=>o.id===editOrderId);
+  if(!order){closeModal();return;}
+  const newQtys={...order.quantities};
+  newQtys[editQtyKey]=editTmpQty;
+  await updateOrderQty(editOrderId,editDest,newQtys);
+  closeModal();
+}
+
+async function treatOrder(orderId,dest,tcid,key){
+  if(!confirm('Marquer cette commande comme traitée ?'))return;
+  await markTreated(orderId,dest);
+  setTimeout(()=>{
+    const tc=document.getElementById(tcid);
+    if(tc){
+      if(dest==='chef')renderChefStore(tcid,key);
+      else renderMgrCat(tcid,key);
+    }
+  },500);
+}
+
+function renderHistory(tcid,dest){
+  const tc=document.getElementById(tcid);
+  const history=dest==='chef'?db.chefHistory:db.managerHistory;
+  if(!history.length){tc.innerHTML='<div class="mgr-body"><div class="mgr-empty"><div style="font-size:36px;margin-bottom:10px;">🗂</div>Aucun historique.</div></div>';return;}
+  let html='<div class="mgr-body">';
+  history.forEach((o,idx)=>{
+    const total=Object.values(o.quantities).reduce((a,b)=>a+b,0);
+    let rows='';
+    Object.keys(o.quantities).forEach(key=>{const q=o.quantities[key];if(!q)return;const[cat,i]=key.split('__');const p=(PRODUCTS[cat]||[])[parseInt(i)];if(!p)return;rows+='<div class="prod-line"><span class="prod-line-name">'+p.name+'</span><span class="prod-line-qty">'+q+' '+p.unit+'</span></div>';});
+    html+='<div class="ocard" onclick="var d=this.querySelector(\'.hdet\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">';
+    html+='<div class="ocard-head"><span class="ocard-store" style="font-size:14px;font-weight:800;">'+o.storeName.toUpperCase()+'</span>'+(o.deliveryDate?'<span class="ocard-livraison">'+o.deliveryDate+'</span>':'')+' <span style="font-size:10px;color:var(--lg);margin-left:auto;">'+o.date+' '+o.time+'</span></div>';
+    html+='<div style="font-size:10px;color:var(--gr);margin-bottom:4px">'+(o.cats||[]).join(' · ')+' · <strong style="color:var(--g)">'+total+' articles</strong></div>';
+    html+='<div class="hdet" style="display:none">'+rows+'</div></div>';
+  });
+  html+='</div>';tc.innerHTML=html;
+}
+
+function renderStocks(tcid){
+  const tc=document.getElementById(tcid);
+  if(!db.stocks.length){tc.innerHTML='<div class="mgr-body"><div class="mgr-empty"><div style="font-size:36px;margin-bottom:10px;">📦</div>Aucun stock reçu.</div></div>';return;}
+  let html='<div class="mgr-body"><div class="five-cards">';
+  STORE_KEYS.forEach(sk=>{
+    const sName=STORE_NAMES[sk];
+    const s=db.stocks.find(x=>x.storeKey===sk);
+    html+='<div class="pdv-card"><div class="pdv-card-head stock-card-head"><span class="pdv-card-name">'+sName+'</span>'+(s?'<span class="pdv-card-total">'+s.date+'</span>':'')+'</div>';
+    if(!s){html+='<div class="pdv-card-empty">Aucun stock</div>';}
+    else{
+      const items=[];
+      Object.keys(s.stocks).forEach(key=>{const q=s.stocks[key];if(!q||q==0)return;const[cat,i]=key.split('__');const p=(PRODUCTS[cat]||[])[parseInt(i)];if(!p)return;items.push({name:p.name,unit:p.unit,q});});
+      if(!items.length)html+='<div class="pdv-card-empty">Aucun stock renseigné</div>';
+      else{html+='<div class="card-sub">';items.forEach(item=>{html+='<div class="card-item"><span class="card-item-name">'+item.name+'</span><span class="card-item-qty">'+item.q+'<span class="card-item-unit"> '+item.unit+'</span></span></div>';});html+='</div>';}
+    }
+    html+='</div>';
+  });
+  html+='</div></div>';tc.innerHTML=html;
+}
+
+function buildTabs(tabsId,tcsId,keys,renderFn,labelFn){
+  const tabsEl=document.getElementById(tabsId);
+  const tcsEl=document.getElementById(tcsId);
+  tabsEl.innerHTML='';tcsEl.innerHTML='';
+  keys.forEach((key,i)=>{
+    const btn=document.createElement('button');
+    btn.className='tab'+(i===0?' active':'');
+    btn.textContent=labelFn(key);
+    btn.id='tab_'+tabsId+'_'+safeId(key);
+    btn.onclick=(k=>()=>{
+      document.querySelectorAll('#'+tabsId+' .tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('#'+tcsId+' .tc').forEach(t=>t.classList.remove('active'));
+      btn.classList.add('active');
+      const tcid=tcsId+'_'+safeId(k);
+      document.getElementById(tcid).classList.add('active');
+      renderFn(k,tcid);
+    })(key);
+    tabsEl.appendChild(btn);
+    const tc=document.createElement('div');
+    tc.className='tc'+(i===0?' active':'');
+    tc.id=tcsId+'_'+safeId(key);
+    tcsEl.appendChild(tc);
+    if(i===0)renderFn(key,tc.id);
+  });
+}
+
+// PDF Chef
+function genChefPDF(sk,type){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const sName=STORE_NAMES[sk];
+  const orders=db.chef.filter(o=>o.storeKey===sk);
+  const W=210,M=15;const isBL=type==='bl';
+  const numBL=isBL?nextBLNum(sk):null;
+  doc.setFillColor(30,92,58);doc.rect(0,0,W,40,'F');
+  doc.setTextColor(245,240,232);
+  doc.setFontSize(22);doc.setFont('helvetica','bold');doc.text('VITALY',M,14);
+  doc.setFontSize(12);doc.text(isBL?'BON DE LIVRAISON':'BON DE COMMANDE',M,23);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('Émis le : '+fmtShort()+' à '+fmtTime(),W-M,23,{align:'right'});
+  if(isBL){doc.setFont('helvetica','bold');doc.text('N° '+numBL,W-M,14,{align:'right'});doc.setFont('helvetica','normal');}
+  // PDV name large
+  doc.setFontSize(16);doc.setFont('helvetica','bold');
+  doc.text(sName.toUpperCase(),M,34);
+  doc.setFillColor(232,97,58);doc.rect(0,40,W,2.5,'F');
+  doc.setTextColor(30,30,30);let y=48;
+  if(!orders.length){doc.setFontSize(11);doc.text('Aucune commande.',M,y);}
+  else{
+    orders.forEach(o=>{
+      if(y>255){doc.addPage();y=20;}
+      doc.setFillColor(245,240,232);doc.rect(M,y-5,W-2*M,9,'F');
+      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(30,92,58);
+      doc.text('Commande du '+o.date+' à '+o.time,M+2,y);
+      if(o.deliveryDate)doc.text('Livraison : '+o.deliveryDate,W-M,y,{align:'right'});
+      y+=7;
+      doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,7,'F');
+      doc.setTextColor(245,240,232);doc.setFontSize(8);doc.setFont('helvetica','bold');
+      doc.text('Produit',M+2,y+5);doc.text('Stock',W-M-42,y+5);doc.text('Unité',W-M-24,y+5);doc.text('Qté',W-M,y+5,{align:'right'});
+      y+=9;doc.setFont('helvetica','normal');doc.setTextColor(40,40,40);
+      const grouped={};
+      Object.keys(o.quantities).forEach(key=>{const q=o.quantities[key];if(!q)return;const[cat,idx]=key.split('__');const p=(PRODUCTS[cat]||[])[parseInt(idx)];if(!p)return;if(!grouped[p.sub])grouped[p.sub]=[];grouped[p.sub].push({name:p.name,unit:p.unit,q,key});});
+      const stockEntry=db.stocks.find(s=>s.storeKey===sk);
+      let rowIdx=0;
+      Object.keys(grouped).forEach(sub=>{
+        if(y>265){doc.addPage();y=20;}
+        doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(30,92,58);doc.text(sub.toUpperCase(),M+2,y);y+=5;
+        doc.setFont('helvetica','normal');doc.setTextColor(40,40,40);
+        grouped[sub].forEach(item=>{
+          if(y>272){doc.addPage();y=20;}
+          if(rowIdx%2===0){doc.setFillColor(250,249,247);doc.rect(M,y-3,W-2*M,6,'F');}
+          const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[item.key]!=null?String(stockEntry.stocks[item.key]):'—';
+          doc.setFontSize(8);
+          doc.text(item.name,M+2,y+1);doc.text(stk,W-M-42,y+1);doc.text(item.unit,W-M-24,y+1);doc.text(String(item.q),W-M,y+1,{align:'right'});
+          doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);
+          y+=6;rowIdx++;
+        });y+=3;
+      });y+=6;
+    });
+  }
+  if(isBL){
+    if(y>240){doc.addPage();y=20;}y+=10;
+    doc.setFillColor(245,240,232);doc.rect(M,y,W-2*M,26,'F');
+    y+=7;doc.setFontSize(8);doc.setTextColor(136,135,128);
+    doc.text('Signature livreur',M+4,y);doc.text('Signature réceptionnaire',W/2+4,y);
+    y+=13;doc.line(M+2,y,M+80,y);doc.line(W/2+2,y,W-M-2,y);
+  }
+  doc.setFontSize(7);doc.setTextColor(180,178,169);doc.text('VITALY — Document généré le '+fmtShort()+' à '+fmtTime(),W/2,290,{align:'center'});
+  doc.save((isBL?'BonLivraison':'BonCommande')+'_VITALY_'+sName.replace(/ /g,'_')+'_'+(isBL?numBL:fmtShort().replace(/\//g,'-'))+'.pdf');
+}
+
+// PDF Manager
+function genMgrPDF(cat){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const prods=PRODUCTS[cat]||[];const W=210,M=15;
+  const subsOrder=getSubs(cat);const singleSub=hasSingleSub(cat);
+  const label=MGR_CAT_LABELS[cat]||cat;
+  const activeOrders=db.manager.filter(o=>!o.treated&&o.cats&&o.cats.includes(cat));
+  STORE_KEYS.forEach((sk,si)=>{
+    if(si>0)doc.addPage();
+    const sName=STORE_NAMES[sk];
+    const skOrders=activeOrders.filter(o=>o.storeKey===sk);
+    const agg={};prods.forEach((_,i)=>{agg[i]=skOrders.reduce((s,o)=>s+(o.quantities[cat+'__'+i]||0),0);});
+    const storeTotal=prods.reduce((s,_,i)=>s+(agg[i]||0),0);
+    const dates=[...new Set(skOrders.map(o=>o.deliveryDate).filter(Boolean))].join(', ');
+    const stockEntry=db.stocks.find(s=>s.storeKey===sk);
+    doc.setFillColor(30,92,58);doc.rect(0,0,W,40,'F');
+    doc.setTextColor(245,240,232);
+    doc.setFontSize(22);doc.setFont('helvetica','bold');doc.text('VITALY',M,14);
+    doc.setFontSize(12);doc.text('BON DE COMMANDE — '+label,M,23);
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Émis le : '+fmtShort(),W-M,23,{align:'right'});
+    // PDV name large
+    doc.setFontSize(16);doc.setFont('helvetica','bold');
+    doc.text(sName.toUpperCase(),M,34);
+    doc.setFontSize(9);doc.setFont('helvetica','normal');
+    if(dates)doc.text('Livraison : '+dates,W-M,34,{align:'right'});
+    doc.setFillColor(232,97,58);doc.rect(0,40,W,2.5,'F');
+    doc.setTextColor(30,30,30);
+    doc.setFontSize(9);doc.setTextColor(136,135,128);
+    doc.text('Total : '+storeTotal+' article(s)',M,46);
+    let y=52;
+    if(storeTotal===0){doc.setFontSize(10);doc.setTextColor(136,135,128);doc.text('Aucune commande.',M,y);}
+    else{
+      doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,7,'F');
+      doc.setTextColor(245,240,232);doc.setFontSize(8);doc.setFont('helvetica','bold');
+      doc.text('Produit',M+2,y+5);doc.text('Stock',W-M-42,y+5);doc.text('Unité',W-M-24,y+5);doc.text('Qté',W-M,y+5,{align:'right'});
+      y+=9;let rowIdx=0;
+      if(!singleSub){
+        subsOrder.forEach(sub=>{
+          const subProds=prods.map((p,i)=>({p,i})).filter(({p,i})=>p.sub===sub&&(agg[i]||0)>0);
+          if(!subProds.length)return;
+          if(y>265){doc.addPage();y=20;}
+          doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(30,92,58);doc.text(sub.toUpperCase(),M+2,y);y+=5;
+          doc.setFont('helvetica','normal');doc.setTextColor(40,40,40);
+          subProds.forEach(({p,i})=>{
+            if(y>272){doc.addPage();y=20;}
+            if(rowIdx%2===0){doc.setFillColor(250,249,247);doc.rect(M,y-3,W-2*M,6,'F');}
+            const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
+            doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(stk,W-M-42,y+1);doc.text(p.unit,W-M-24,y+1);doc.text(String(agg[i]),W-M,y+1,{align:'right'});
+            doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
+          });y+=3;
+        });
+      }else{
+        prods.forEach((p,i)=>{const q=agg[i]||0;if(!q)return;
+          if(y>272){doc.addPage();y=20;}
+          if(rowIdx%2===0){doc.setFillColor(250,249,247);doc.rect(M,y-3,W-2*M,6,'F');}
+          const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
+          doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(stk,W-M-42,y+1);doc.text(p.unit,W-M-24,y+1);doc.text(String(q),W-M,y+1,{align:'right'});
+          doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
+        });
+      }
+    }
+    doc.setFontSize(7);doc.setTextColor(180,178,169);doc.text('VITALY — '+label+' — Généré le '+fmtShort()+' à '+fmtTime(),W/2,290,{align:'center'});
+  });
+  doc.save('BonCommande_VITALY_'+label.replace(/ /g,'_')+'_'+fmtShort().replace(/\//g,'-')+'.pdf');
+}
+</script>
+</body>
+</html>
