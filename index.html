@@ -2006,19 +2006,7 @@ function renderFactures(tcid){
   previewBtn.textContent='Aperçu de la facture';
   previewBtn.addEventListener('click',()=>previewFacture(tcid));
   wrapper.appendChild(previewBtn);
-  // Reset counter button
-  const resetRow=document.createElement('div');resetRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
-  const resetBtn=document.createElement('button');
-  resetBtn.style.cssText='flex:1;padding:8px;border-radius:8px;border:.5px solid var(--bd);font-size:11px;font-weight:600;cursor:pointer;background:white;color:var(--gr);';
-  resetBtn.textContent='Réinitialiser le compteur à 01';
-  resetBtn.addEventListener('click',()=>{
-    if(confirm('Remettre le compteur de factures à 01 ce mois-ci ?')){
-      resetFactureCounter();
-      alert('Compteur remis à 01. La prochaine facture sera ...01');
-    }
-  });
-  resetRow.appendChild(resetBtn);
-  wrapper.appendChild(resetRow);
+
   // Preview area
   const prevDiv=document.createElement('div');prevDiv.id='fact-preview';
   wrapper.appendChild(prevDiv);
@@ -2110,8 +2098,7 @@ function previewFacture(tcid){
 }
 
 function deleteFacture(){
-  if(!confirm('Supprimer cette facture ?\nL’aperçu sera effacé et le numéro annulé.'))return;
-  // Decrement counter
+  if(!confirm('Supprimer cette facture ?\nElle sera annulée comme si elle n’avait jamais existé.'))return;
   const now=new Date();
   const yr=now.getFullYear();
   const mm=String(now.getMonth()+1).padStart(2,'0');
@@ -2119,9 +2106,9 @@ function deleteFacture(){
   const stored=JSON.parse(localStorage.getItem(key)||'{"n":1}');
   stored.n=Math.max(0,stored.n-1);
   localStorage.setItem(key,JSON.stringify(stored));
-  // Clear preview
   const prevDiv=document.getElementById('fact-preview');
-  if(prevDiv)prevDiv.innerHTML='<div style="background:rgba(229,115,115,.08);border-radius:9px;padding:14px;font-size:12px;color:#E57373;text-align:center;margin-top:8px;">Facture supprimée. Compteur remis à '+(stored.n)+' — prochaine facture : FACT-'+yr+'-'+mm+'-'+String(stored.n+1).padStart(2,'0')+'</div>';
+  const nextNum='FACT-'+yr+'-'+mm+'-'+String(stored.n+1).padStart(2,'0');
+  if(prevDiv)prevDiv.innerHTML='<div style="background:rgba(229,115,115,.06);border:.5px solid #E57373;border-radius:9px;padding:14px;font-size:12px;color:#E57373;text-align:center;margin-top:8px;">Facture supprimée — Prochain numéro : '+nextNum+'</div>';
 }
 
 function genFacturePDF(sk,startVal,endVal,factNum){
@@ -2146,127 +2133,100 @@ function genFacturePDF(sk,startVal,endVal,factNum){
   const lines=Object.values(totals).filter(l=>l.qty>0);
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const W=210,M=15;
+  const W=210,M=12;
   const storeName=STORE_NAMES[sk];
   const startStr=startDate.toLocaleDateString('fr-FR');
   const endStr=new Date(endVal).toLocaleDateString('fr-FR');
   const today=new Date().toLocaleDateString('fr-FR');
-
-  // ---- HEADER VERT ----
-  doc.setFillColor(30,92,58);doc.rect(0,0,W,50,'F');
+  // HEADER
+  doc.setFillColor(30,92,58);doc.rect(0,0,W,34,'F');
   doc.setTextColor(245,240,232);
-  doc.setFontSize(22);doc.setFont('helvetica','bold');doc.text('FOODPROD',M,14);
-  doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('SAS FOODPROD',M,20);
-  doc.text('46 Rue Juliette Dodu — 97400 Saint-Denis',M,25);
-  doc.text('SIRET : 940 521 891 00017',M,30);
-  doc.text('xavier.foodprod@gmail.com',M,35);
-  // Facture num + date (droite)
-  doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text(factNum,W-M,14,{align:'right'});
-  doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('Emise le '+today,W-M,20,{align:'right'});
-  doc.text('Periode : '+startStr+' au '+endStr,W-M,26,{align:'right'});
-  doc.setFillColor(232,97,58);doc.rect(0,50,W,2.5,'F');
-
-  // ---- BLOC EMETTEUR / CLIENT ----
-  let y=60;
-  // Émetteur (gauche)
-  doc.setFillColor(248,247,245);doc.rect(M,y,85,28,'F');
-  doc.setTextColor(30,92,58);doc.setFontSize(7);doc.setFont('helvetica','bold');
-  doc.text('DE (FOURNISSEUR)',M+3,y+5);
-  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(8);
-  doc.text('SAS FOODPROD',M+3,y+11);
-  doc.text('46 Rue Juliette Dodu',M+3,y+16);
-  doc.text('97400 Saint-Denis',M+3,y+21);
-  doc.setFontSize(7);doc.setTextColor(100,100,100);
-  doc.text('xavier.foodprod@gmail.com',M+3,y+26);
-  // Client (droite)
-  doc.setFillColor(245,240,232);doc.rect(W/2+5,y,W/2-M-5,28,'F');
-  doc.setTextColor(30,92,58);doc.setFontSize(7);doc.setFont('helvetica','bold');
-  doc.text('A (CLIENT)',W/2+8,y+5);
-  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(8);
-  doc.text('SAS VITALY OUEST',W/2+8,y+11);
-  doc.text('46 Rue Juliette Dodu',W/2+8,y+16);
-  doc.text('97400 Saint-Denis',W/2+8,y+21);
-  doc.setFontSize(7);doc.setTextColor(100,100,100);
-  doc.text('SIRET : 898 080 973 00065',W/2+8,y+26);
-  y+=35;
-
-  // ---- NOTE PDV ----
-  doc.setFillColor(232,97,58,0.1);
-  doc.setDrawColor(232,97,58);
-  doc.setFillColor(255,245,240);
-  doc.rect(M,y,W-2*M,9,'F');
-  doc.setTextColor(232,97,58);doc.setFontSize(8);doc.setFont('helvetica','bold');
-  doc.text('Point de vente concerne : '+storeName.toUpperCase(),M+3,y+6);
-  y+=14;
-
-  // ---- TABLE HEADER ----
-  doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,7,'F');
-  doc.setTextColor(245,240,232);doc.setFontSize(8);doc.setFont('helvetica','bold');
-  doc.text('Produit',M+2,y+5);
-  doc.text('Qte',W-M-60,y+5,{align:'right'});
-  doc.text('PU HT',W-M-28,y+5,{align:'right'});
-  doc.text('Total HT',W-M,y+5,{align:'right'});
-  y+=9;
-
-  // ---- LIGNES PRODUITS ----
+  doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text('FOODPROD',M,12);
+  doc.setFontSize(7);doc.setFont('helvetica','normal');
+  doc.text('SAS FOODPROD — 46 Rue Juliette Dodu — 97400 Saint-Denis',M,18);
+  doc.text('SIRET : 940 521 891 00017 — xavier.foodprod@gmail.com',M,23);
+  doc.setFontSize(12);doc.setFont('helvetica','bold');doc.text(factNum,W-M,12,{align:'right'});
+  doc.setFontSize(7);doc.setFont('helvetica','normal');
+  doc.text('Emise le '+today,W-M,18,{align:'right'});
+  doc.text('Periode : '+startStr+' au '+endStr,W-M,23,{align:'right'});
+  doc.setFillColor(232,97,58);doc.rect(0,34,W,2,'F');
+  // BLOCS DE/A
+  let y=39;
+  const colW=(W-2*M-4)/2;
+  doc.setFillColor(248,247,245);doc.rect(M,y,colW,18,'F');
+  doc.setTextColor(30,92,58);doc.setFontSize(6);doc.setFont('helvetica','bold');doc.text('DE (FOURNISSEUR)',M+2,y+4);
+  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
+  doc.text('SAS FOODPROD',M+2,y+9);doc.text('46 Rue Juliette Dodu — 97400 Saint-Denis',M+2,y+13);
+  doc.setFontSize(6);doc.setTextColor(100,100,100);doc.text('xavier.foodprod@gmail.com',M+2,y+17);
+  const col2X=M+colW+4;
+  doc.setFillColor(245,240,232);doc.rect(col2X,y,colW,18,'F');
+  doc.setTextColor(30,92,58);doc.setFontSize(6);doc.setFont('helvetica','bold');doc.text('A (CLIENT)',col2X+2,y+4);
+  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
+  doc.text('SAS VITALY OUEST',col2X+2,y+9);doc.text('46 Rue Juliette Dodu — 97400 Saint-Denis',col2X+2,y+13);
+  doc.setFontSize(6);doc.setTextColor(100,100,100);doc.text('SIRET : 898 080 973 00065 — roxane@vitaly.re',col2X+2,y+17);
+  y+=22;
+  // NOTE PDV
+  doc.setFillColor(255,245,240);doc.rect(M,y,W-2*M,6,'F');
+  doc.setTextColor(232,97,58);doc.setFontSize(7);doc.setFont('helvetica','bold');
+  doc.text('Point de vente : '+storeName.toUpperCase(),M+2,y+4);
+  y+=10;
+  // TABLE HEADER
+  doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,6,'F');
+  doc.setTextColor(245,240,232);doc.setFontSize(7);doc.setFont('helvetica','bold');
+  doc.text('Produit',M+2,y+4);
+  doc.text('Qte',W-M-50,y+4,{align:'right'});
+  doc.text('PU HT',W-M-24,y+4,{align:'right'});
+  doc.text('Total HT',W-M,y+4,{align:'right'});
+  y+=7;
+  // LIGNES
   let totalHT=0;let rowIdx=0;
   lines.forEach(l=>{
-    if(y>265){doc.addPage();y=20;}
-    if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}
-    else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}
+    if(rowIdx%2===0){doc.setFillColor(249,248,246);doc.rect(M,y-2.5,W-2*M,5,'F');}
+    else{doc.setFillColor(255,255,255);doc.rect(M,y-2.5,W-2*M,5,'F');}
     const lineTotal=l.qty*(l.puHT||0);totalHT+=lineTotal;
-    doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(8);
+    const unitLabel=l.qty>1?(l.unit==='poche'?'poches':l.unit==='pc'?'pcs':l.unit+'s'):l.unit;
+    doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
     doc.text(l.name,M+2,y+1);
-    doc.text(l.qty+' '+l.unit,W-M-60,y+1,{align:'right'});
-    doc.text(l.puHT?l.puHT.toFixed(2)+' EUR':'—',W-M-28,y+1,{align:'right'});
+    doc.text(String(l.qty)+' '+unitLabel,W-M-50,y+1,{align:'right'});
+    doc.text(l.puHT?l.puHT.toFixed(2):'—',W-M-24,y+1,{align:'right'});
     doc.setFont('helvetica','bold');
-    doc.text(lineTotal>0?lineTotal.toFixed(2)+' EUR':'—',W-M,y+1,{align:'right'});
+    doc.text(lineTotal>0?lineTotal.toFixed(2):'—',W-M,y+1,{align:'right'});
     doc.setFont('helvetica','normal');
-    doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);
-    y+=6;rowIdx++;
+    doc.setDrawColor(230,228,222);doc.line(M,y+2.5,W-M,y+2.5);
+    y+=5;rowIdx++;
   });
-
-  // ---- TOTAUX ----
-  y+=6;
-  if(y>265){doc.addPage();y=20;}
+  // TOTAUX
+  y+=3;
   const tva=totalHT*TVA_RATE;
   const ttc=totalHT+tva;
-  const totX=W-M-70;
-  doc.setDrawColor(220,218,212);doc.line(totX,y,W-M,y);y+=5;
-  doc.setFontSize(9);doc.setTextColor(100,100,100);doc.setFont('helvetica','normal');
-  doc.text('Total HT',totX,y);
-  doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');
-  doc.text(totalHT.toFixed(2)+' EUR',W-M,y,{align:'right'});y+=6;
+  const totX=W-M-62;
+  doc.setDrawColor(200,198,192);doc.line(totX,y,W-M,y);y+=4;
+  doc.setFontSize(8);doc.setTextColor(100,100,100);doc.setFont('helvetica','normal');
+  doc.text('Total HT',totX,y);doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');
+  doc.text(totalHT.toFixed(2)+' EUR',W-M,y,{align:'right'});y+=5;
   doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
-  doc.text('TVA 2,10%',totX,y);
-  doc.setTextColor(30,30,30);doc.text(tva.toFixed(2)+' EUR',W-M,y,{align:'right'});y+=6;
-  doc.setFillColor(30,92,58);doc.rect(totX-2,y-4,W-M-totX+4,10,'F');
-  doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');doc.setFontSize(10);
-  doc.text('TOTAL TTC',totX,y+3);
-  doc.text(ttc.toFixed(2)+' EUR',W-M-2,y+3,{align:'right'});
-
-  // ---- DELAI PAIEMENT + RIB ----
-  y+=10;
-  if(y>250){doc.addPage();y=20;}
-  doc.setFillColor(248,247,245);doc.rect(M,y,W-2*M,8,'F');
-  doc.setTextColor(30,92,58);doc.setFontSize(8);doc.setFont('helvetica','bold');
-  doc.text('Conditions de paiement : A reception de facture',M+3,y+5.5);
-  y+=14;
-  // RIB block
-  doc.setFillColor(240,248,244);doc.rect(M,y,W/2-M-5,26,'F');
-  doc.setDrawColor(30,92,58);doc.rect(M,y,W/2-M-5,26);
+  doc.text('TVA 2,10%',totX,y);doc.setTextColor(30,30,30);
+  doc.text(tva.toFixed(2)+' EUR',W-M,y,{align:'right'});y+=5;
+  doc.setFillColor(30,92,58);doc.rect(totX-2,y-3,W-M-totX+4,8,'F');
+  doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');doc.setFontSize(9);
+  doc.text('TOTAL TTC',totX,y+2.5);doc.text(ttc.toFixed(2)+' EUR',W-M-1,y+2.5,{align:'right'});
+  y+=12;
+  // CONDITIONS
+  doc.setFillColor(248,247,245);doc.rect(M,y,W-2*M,6,'F');
   doc.setTextColor(30,92,58);doc.setFontSize(7);doc.setFont('helvetica','bold');
-  doc.text('COORDONNEES BANCAIRES',M+3,y+5);
-  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');
-  doc.text('Banque : CR Reunion Mayotte',M+3,y+10);
-  doc.text('IBAN : FR76 1990 6009 7430 0243 9286 021',M+3,y+15);
-  doc.text('BIC : AGRIRERX',M+3,y+20);
-  doc.text('Au nom de : SAS FOODPROD',M+3,y+25);
-  // ---- FOOTER ----
-  doc.setFontSize(7);doc.setTextColor(180,178,169);doc.setFont('helvetica','normal');
-  doc.text('SAS FOODPROD — SIRET 940 521 891 00017 — '+factNum+' — '+storeName+' — '+startStr+' au '+endStr,W/2,290,{align:'center'});
+  doc.text('Conditions de paiement : A reception de facture',M+2,y+4);
+  y+=9;
+  // RIB
+  doc.setFillColor(240,248,244);doc.rect(M,y,colW+15,16,'F');
+  doc.setDrawColor(30,92,58);doc.rect(M,y,colW+15,16);
+  doc.setTextColor(30,92,58);doc.setFontSize(6);doc.setFont('helvetica','bold');doc.text('COORDONNEES BANCAIRES',M+2,y+4);
+  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
+  doc.text('Banque : CR Reunion Mayotte — BIC : AGRIRERX',M+2,y+8);
+  doc.text('IBAN : FR76 1990 6009 7430 0243 9286 021',M+2,y+12);
+  doc.text('Au nom de : SAS FOODPROD',M+2,y+16);
+  // FOOTER
+  doc.setFontSize(6);doc.setTextColor(180,178,169);doc.setFont('helvetica','normal');
+  doc.text('SAS FOODPROD — SIRET 940 521 891 00017 — '+factNum+' — '+storeName+' — '+startStr+' au '+endStr,W/2,291,{align:'center'});
   doc.save('Facture_FOODPROD_'+storeName.replace(/ /g,'_')+'_'+factNum+'.pdf');
 }
 
