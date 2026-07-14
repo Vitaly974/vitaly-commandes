@@ -1385,10 +1385,11 @@ async function confirmSend(){
 // CHEF
 function openChef(){
   lastSeenChef=Date.now();
-  buildTabs('sc-tabs','sc-tcs',['dashboard_chef',...STORE_KEYS,'catalogue','tarifs_chef','pertes_chef_tab','hist_pertes_chef','hist_chef'],(sk,tcid)=>{
+  buildTabs('sc-tabs','sc-tcs',['dashboard_chef',...STORE_KEYS,'catalogue','tarifs_chef','factures_chef','pertes_chef_tab','hist_pertes_chef','hist_chef'],(sk,tcid)=>{
     if(sk==='dashboard_chef')renderChefDashboard(tcid);
     else if(sk==='catalogue')renderCatalogue(tcid);
     else if(sk==='tarifs_chef')renderTarifs(tcid,'chef');
+    else if(sk==='factures_chef')renderFactures(tcid);
     else if(sk==='pertes_chef_tab')renderPertesChefTab(tcid);
     else if(sk==='hist_pertes_chef')renderHistPerteChef(tcid);
     else if(sk==='hist_chef')renderHistory(tcid,'chef');
@@ -1397,6 +1398,7 @@ function openChef(){
     if(sk==='dashboard_chef')return 'Tableau de bord';
     if(sk==='catalogue')return 'Catalogue';
     if(sk==='tarifs_chef')return 'Tarifs LABO';
+    if(sk==='factures_chef')return 'Factures';
     if(sk==='pertes_chef_tab')return 'Pertes LABO';
     if(sk==='hist_pertes_chef')return 'Recap Pertes';
     if(sk==='hist_chef')return 'Historique';
@@ -1937,6 +1939,230 @@ function genInventairePDF(sk){
   doc.setFontSize(7);doc.setTextColor(180,178,169);
   doc.text('VITALY — Inventaire '+sName+' — '+inv.date,W/2,290,{align:'center'});
   doc.save('Inventaire_VITALY_'+sName.replace(/ /g,'_')+'_'+inv.date.replace(/\//g,'-')+'.pdf');
+}
+
+// ============================================================
+// FACTURES
+// ============================================================
+const TVA_RATE = 0.021; // 2,10% Réunion
+
+function getFactureNum(){
+  const now=new Date();
+  const yr=now.getFullYear();
+  const stored=JSON.parse(localStorage.getItem('vitaly_fact_counter')||'{"yr":'+yr+',"n":0}');
+  if(stored.yr!==yr){stored.yr=yr;stored.n=0;}
+  stored.n++;
+  localStorage.setItem('vitaly_fact_counter',JSON.stringify(stored));
+  return 'FACT-'+yr+'-'+String(stored.n).padStart(3,'0');
+}
+
+function renderFactures(tcid){
+  const tc=document.getElementById(tcid);
+  tc.innerHTML='';
+  const wrapper=document.createElement('div');wrapper.className='space-body';
+  // Info banner
+  const info=document.createElement('div');
+  info.style.cssText='background:rgba(30,92,58,.08);border-radius:9px;padding:12px 14px;font-size:11px;color:var(--g);margin-bottom:16px;border:.5px solid rgba(30,92,58,.2);';
+  info.innerHTML='<strong>Génération de factures</strong><br>Sélectionnez un point de vente et une période. La facture est générée depuis les commandes LABO traitées.';
+  wrapper.appendChild(info);
+  // PDV selector
+  const pdvLbl=document.createElement('div');pdvLbl.style.cssText='font-size:10px;font-weight:700;color:var(--g);letter-spacing:1px;margin-bottom:6px;';pdvLbl.textContent='POINT DE VENTE';
+  wrapper.appendChild(pdvLbl);
+  const pdvSel=document.createElement('select');pdvSel.id='fact-pdv';
+  pdvSel.style.cssText='width:100%;border:.5px solid var(--bd);border-radius:8px;padding:9px;font-size:12px;margin-bottom:14px;background:white;';
+  pdvSel.innerHTML='<option value="">— Sélectionner un PDV —</option>';
+  STORE_KEYS.forEach(sk=>{
+    const o=document.createElement('option');o.value=sk;o.textContent=STORE_NAMES[sk];
+    pdvSel.appendChild(o);
+  });
+  wrapper.appendChild(pdvSel);
+  // Period selector
+  const perLbl=document.createElement('div');perLbl.style.cssText='font-size:10px;font-weight:700;color:var(--g);letter-spacing:1px;margin-bottom:6px;';perLbl.textContent='PÉRIODE';
+  wrapper.appendChild(perLbl);
+  const dateRow=document.createElement('div');dateRow.style.cssText='display:flex;gap:8px;margin-bottom:14px;align-items:center;';
+  const d1=document.createElement('input');d1.type='date';d1.id='fact-date-start';d1.style.cssText='flex:1;border:.5px solid var(--bd);border-radius:8px;padding:8px;font-size:12px;';
+  const sep=document.createElement('span');sep.style.cssText='font-size:11px;color:var(--gr);';sep.textContent='→';
+  const d2=document.createElement('input');d2.type='date';d2.id='fact-date-end';d2.style.cssText='flex:1;border:.5px solid var(--bd);border-radius:8px;padding:8px;font-size:12px;';
+  // Default: current week (Monday to Sunday)
+  const today=new Date();
+  const dow=today.getDay();
+  const monday=new Date(today);monday.setDate(today.getDate()-(dow===0?6:dow-1));
+  const sunday=new Date(monday);sunday.setDate(monday.getDate()+6);
+  d1.value=monday.toISOString().split('T')[0];
+  d2.value=sunday.toISOString().split('T')[0];
+  dateRow.appendChild(d1);dateRow.appendChild(sep);dateRow.appendChild(d2);
+  wrapper.appendChild(dateRow);
+  // Preview button
+  const previewBtn=document.createElement('button');
+  previewBtn.style.cssText='width:100%;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--g);color:white;margin-bottom:12px;';
+  previewBtn.textContent='Aperçu de la facture';
+  previewBtn.addEventListener('click',()=>previewFacture(tcid));
+  wrapper.appendChild(previewBtn);
+  // Preview area
+  const prevDiv=document.createElement('div');prevDiv.id='fact-preview';
+  wrapper.appendChild(prevDiv);
+  tc.appendChild(wrapper);
+}
+
+function parseDate(str){
+  // str is French format dd/mm/yyyy
+  if(!str)return null;
+  const parts=str.split('/');
+  if(parts.length!==3)return null;
+  return new Date(parseInt(parts[2]),parseInt(parts[1])-1,parseInt(parts[0]));
+}
+
+function previewFacture(tcid){
+  const sk=document.getElementById('fact-pdv').value;
+  const startVal=document.getElementById('fact-date-start').value;
+  const endVal=document.getElementById('fact-date-end').value;
+  if(!sk){alert('Veuillez sélectionner un point de vente.');return;}
+  if(!startVal||!endVal){alert('Veuillez sélectionner une période.');return;}
+  const startDate=new Date(startVal);
+  const endDate=new Date(endVal);endDate.setHours(23,59,59);
+  // Filter chef_history for this PDV and period - LABO only
+  const orders=db.chefHistory.filter(o=>{
+    if(o.storeKey!==sk)return false;
+    const oDate=new Date(o.treatedAt||0);
+    return oDate>=startDate&&oDate<=endDate;
+  });
+  // Build product totals from LABO quantities
+  const totals={};
+  orders.forEach(o=>{
+    Object.keys(o.quantities||{}).forEach(key=>{
+      const q=o.quantities[key];if(!q)return;
+      const[cat,i]=key.split('__');
+      if(cat!=='LABO')return;
+      const p=(PRODUCTS['LABO']||[])[parseInt(i)];if(!p)return;
+      if(!totals[key])totals[key]={name:p.name,unit:p.unit,qty:0,puHT:getPrice(key)};
+      totals[key].qty+=q;
+    });
+  });
+  const lines=Object.values(totals).filter(l=>l.qty>0);
+  const prevDiv=document.getElementById('fact-preview');
+  if(!lines.length){
+    prevDiv.innerHTML='<div style="background:rgba(232,97,58,.08);border-radius:9px;padding:14px;font-size:12px;color:var(--or);text-align:center;margin-top:8px;">Aucune commande LABO traitée pour ce PDV sur cette période.</div>';
+    return;
+  }
+  // Build preview table
+  const storeName=STORE_NAMES[sk];
+  const startStr=startDate.toLocaleDateString('fr-FR');
+  const endStr=new Date(endVal).toLocaleDateString('fr-FR');
+  const factNum=getFactureNum();
+  let totalHT=0;
+  lines.forEach(l=>{totalHT+=l.qty*(l.puHT||0);});
+  const tva=totalHT*TVA_RATE;
+  const ttc=totalHT+tva;
+  let html='<div style="background:white;border:.5px solid var(--bd);border-radius:12px;overflow:hidden;margin-top:4px;">';
+  html+='<div style="background:var(--g);padding:14px 16px;color:white;">';
+  html+='<div style="font-size:16px;font-weight:800;letter-spacing:2px;">VITALY LABO</div>';
+  html+='<div style="font-size:10px;opacity:.8;margin-top:2px;">Facture '+factNum+'</div>';
+  html+='<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;">';
+  html+='<div><div style="opacity:.7;font-size:9px;">CLIENT</div><div style="font-weight:700;">'+storeName.toUpperCase()+'</div></div>';
+  html+='<div style="text-align:right;"><div style="opacity:.7;font-size:9px;">PÉRIODE</div><div style="font-weight:700;">'+startStr+' → '+endStr+'</div></div>';
+  html+='</div></div>';
+  // Table header
+  html+='<div style="display:grid;grid-template-columns:1fr 60px 70px 75px;gap:4px;padding:7px 12px;background:rgba(30,92,58,.06);font-size:9px;font-weight:700;color:var(--g);letter-spacing:1px;">';
+  html+='<div>PRODUIT</div><div style="text-align:right;">QTÉ</div><div style="text-align:right;">PU HT</div><div style="text-align:right;">TOTAL HT</div></div>';
+  // Lines
+  lines.forEach((l,idx)=>{
+    const lineTotal=l.qty*(l.puHT||0);
+    html+='<div style="display:grid;grid-template-columns:1fr 60px 70px 75px;gap:4px;padding:7px 12px;font-size:11px;'+(idx%2===0?'background:rgba(0,0,0,.02)':'')+';">';
+    html+='<div style="color:#2C2C2A;">'+l.name+'</div>';
+    html+='<div style="text-align:right;color:var(--g);font-weight:600;">'+l.qty+' '+l.unit+'</div>';
+    html+='<div style="text-align:right;color:var(--gr);">'+(l.puHT?l.puHT.toFixed(2)+' €':'—')+'</div>';
+    html+='<div style="text-align:right;font-weight:700;color:#2C2C2A;">'+(lineTotal>0?lineTotal.toFixed(2)+' €':'—')+'</div>';
+    html+='</div>';
+  });
+  // Totals
+  html+='<div style="border-top:.5px solid var(--bd);padding:10px 12px;">';
+  html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">Total HT</span><span style="font-weight:700;">'+totalHT.toFixed(2)+' €</span></div>';
+  html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">TVA (2,10%)</span><span>'+tva.toFixed(2)+' €</span></div>';
+  html+='<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--g);border-top:.5px solid var(--bd);padding-top:8px;margin-top:4px;"><span>TOTAL TTC</span><span>'+ttc.toFixed(2)+' €</span></div>';
+  html+='</div></div>';
+  // Download button
+  html+='<button onclick="genFacturePDF(\''+sk+'\',\''+startVal+'\',\''+endVal+'\',\''+factNum+'\')" style="width:100%;margin-top:10px;padding:13px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--or);color:white;">📄 Télécharger la facture PDF</button>';
+  prevDiv.innerHTML=html;
+}
+
+function genFacturePDF(sk,startVal,endVal,factNum){
+  const startDate=new Date(startVal);
+  const endDate=new Date(endVal);endDate.setHours(23,59,59);
+  const orders=db.chefHistory.filter(o=>{
+    if(o.storeKey!==sk)return false;
+    const oDate=new Date(o.treatedAt||0);
+    return oDate>=startDate&&oDate<=endDate;
+  });
+  const totals={};
+  orders.forEach(o=>{
+    Object.keys(o.quantities||{}).forEach(key=>{
+      const q=o.quantities[key];if(!q)return;
+      const[cat,i]=key.split('__');
+      if(cat!=='LABO')return;
+      const p=(PRODUCTS['LABO']||[])[parseInt(i)];if(!p)return;
+      if(!totals[key])totals[key]={name:p.name,unit:p.unit,qty:0,puHT:getPrice(key)};
+      totals[key].qty+=q;
+    });
+  });
+  const lines=Object.values(totals).filter(l=>l.qty>0);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,M=15;
+  const storeName=STORE_NAMES[sk];
+  const startStr=startDate.toLocaleDateString('fr-FR');
+  const endStr=new Date(endVal).toLocaleDateString('fr-FR');
+  const today=new Date().toLocaleDateString('fr-FR');
+  // Header vert
+  doc.setFillColor(30,92,58);doc.rect(0,0,W,45,'F');
+  doc.setTextColor(245,240,232);
+  doc.setFontSize(26);doc.setFont('helvetica','bold');doc.text('VITALY',M,16);
+  doc.setFontSize(11);doc.setFont('helvetica','normal');doc.text('LABO — Facture interne',M,24);
+  // Facture num + date
+  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text(factNum,W-M,16,{align:'right'});
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Émise le '+today,W-M,24,{align:'right'});
+  // Client + period
+  doc.setFontSize(11);doc.setFont('helvetica','bold');doc.text(storeName.toUpperCase(),M,35);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Période : '+startStr+' → '+endStr,W-M,35,{align:'right'});
+  doc.setFillColor(232,97,58);doc.rect(0,45,W,2.5,'F');
+  // Table header
+  let y=54;
+  doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,7,'F');
+  doc.setTextColor(245,240,232);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('Produit',M+2,y+5);
+  doc.text('Qté',W-M-60,y+5,{align:'right'});
+  doc.text('PU HT (€)',W-M-30,y+5,{align:'right'});
+  doc.text('Total HT (€)',W-M,y+5,{align:'right'});
+  y+=9;
+  let totalHT=0;let rowIdx=0;
+  lines.forEach(l=>{
+    if(y>265){doc.addPage();y=20;}
+    if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}
+    else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}
+    const lineTotal=l.qty*(l.puHT||0);totalHT+=lineTotal;
+    doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(8);
+    doc.text(l.name,M+2,y+1);
+    doc.text(l.qty+' '+l.unit,W-M-60,y+1,{align:'right'});
+    doc.text(l.puHT?l.puHT.toFixed(2):'—',W-M-30,y+1,{align:'right'});
+    doc.setFont('helvetica','bold');doc.text(lineTotal>0?lineTotal.toFixed(2):'—',W-M,y+1,{align:'right'});
+    doc.setFont('helvetica','normal');
+    doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);
+    y+=6;rowIdx++;
+  });
+  // Totals block
+  y+=4;
+  const tva=totalHT*TVA_RATE;
+  const ttc=totalHT+tva;
+  doc.setFontSize(9);doc.setTextColor(100,100,100);
+  doc.text('Total HT',W-M-40,y);doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');doc.text(totalHT.toFixed(2)+' €',W-M,y,{align:'right'});y+=6;
+  doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
+  doc.text('TVA 2,10%',W-M-40,y);doc.setTextColor(30,30,30);doc.text(tva.toFixed(2)+' €',W-M,y,{align:'right'});y+=6;
+  doc.setFillColor(30,92,58);doc.rect(W-M-55,y-4,55,9,'F');
+  doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');doc.setFontSize(10);
+  doc.text('TOTAL TTC',W-M-53,y+2);doc.text(ttc.toFixed(2)+' €',W-M-2,y+2,{align:'right'});
+  // Footer
+  doc.setFontSize(7);doc.setTextColor(180,178,169);doc.setFont('helvetica','normal');
+  doc.text('VITALY — Document interne — '+factNum+' — '+storeName+' — '+startStr+' au '+endStr,W/2,290,{align:'center'});
+  doc.save('Facture_VITALY_'+storeName.replace(/ /g,'_')+'_'+factNum+'.pdf');
 }
 
 function renderHistory(tcid,dest,filterDate){
