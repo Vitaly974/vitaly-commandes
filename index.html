@@ -654,7 +654,7 @@ function fmtPrice(p){return p>0?(p.toFixed(2).replace('.',',')+' €'):'—';}
 
 // State
 let st={profile:'',storeKey:'',pin:'',quantities:{},stocks:{},checked:{},deliveryDate:''};
-const db={chef:[],manager:[],chefHistory:[],managerHistory:[],stocks:[],catalogue:{},notice:null,inventories:[],pertesPDV:[],pertesChef:[]};
+const db={chef:[],manager:[],chefHistory:[],managerHistory:[],stocks:[],catalogue:{},notice:null,inventories:[],pertesPDV:[],pertesChef:[],stockLabo:[]};
 let editKey='',editTmpQty=0;
 let lastSeenChef=0,lastSeenMgr=0;
 
@@ -743,6 +743,10 @@ function initFirebaseListeners(){
   // Listen for pertes Chef
   window.fsLib.onSnapshot(window.fsLib.query(window.fsLib.collection(fdb,'pertes_chef'),window.fsLib.orderBy('timestamp','desc')),snap=>{
     db.pertesChef=snap.docs.map(d=>({id:d.id,...d.data()}));
+  });
+  // Listen for stock LABO
+  window.fsLib.onSnapshot(window.fsLib.collection(fdb,'stock_labo'),snap=>{
+    db.stockLabo=snap.docs.map(d=>({id:d.id,...d.data()}));
   });
   document.getElementById('loading').style.display='none';
   show('sh');
@@ -1385,8 +1389,9 @@ async function confirmSend(){
 // CHEF
 function openChef(){
   lastSeenChef=Date.now();
-  buildTabs('sc-tabs','sc-tcs',['dashboard_chef',...STORE_KEYS,'catalogue','tarifs_chef','factures_chef','pertes_chef_tab','hist_pertes_chef','hist_chef'],(sk,tcid)=>{
+  buildTabs('sc-tabs','sc-tcs',['dashboard_chef',...STORE_KEYS,'stock_labo','catalogue','tarifs_chef','factures_chef','pertes_chef_tab','hist_pertes_chef','hist_chef'],(sk,tcid)=>{
     if(sk==='dashboard_chef')renderChefDashboard(tcid);
+    else if(sk==='stock_labo')renderStockLabo(tcid);
     else if(sk==='catalogue')renderCatalogue(tcid);
     else if(sk==='tarifs_chef')renderTarifs(tcid,'chef');
     else if(sk==='factures_chef')renderFactures(tcid);
@@ -1396,6 +1401,7 @@ function openChef(){
     else renderChefStore(tcid,sk);
   },sk=>{
     if(sk==='dashboard_chef')return 'Tableau de bord';
+    if(sk==='stock_labo')return 'Stock LABO';
     if(sk==='catalogue')return 'Catalogue';
     if(sk==='tarifs_chef')return 'Tarifs LABO';
     if(sk==='factures_chef')return 'Factures';
@@ -1406,6 +1412,241 @@ function openChef(){
     return STORE_NAMES[sk]+(cnt>0?' ('+cnt+')':'');
   });
   show('sc');
+}
+
+// ============================================================
+// STOCK LABO
+// ============================================================
+const LABO_STOCK_CATS={
+  '4e gammes':['Salade','Carotte rapee','Concombre eboute','Baby concombre','Oignon cube','Tomate entiere','Tomate cerise','Champignon de paris'],
+  'Feculents':['Pates','Quinoa','Boulgour'],
+  'Legumes cuisines':['Brocolis grilles','Coleslaw','Patate douce roti','Aubergine grillee','Saute de legume','Butternut roti','Carotte roti miel Paprika','Haricot vert au beurre','Pomme de terre roti','Haricots vert champignons creme','Legumes du soleil','Pickles carottes gingembre','Salade patate douce','Haricot vert patate douce'],
+  'Viande':['Jambon'],
+  'Dressing poulet':['Citron herbes ail','Chimichurri','Teriyaki sesame poulet','Curry poulet'],
+  'Dressing thon':['Mediterraneen','Teriyaki sesame thon','Citron thon','Curry mangue'],
+  'Vinaigrette':['Balsamique','Moutarde miel','Moutarde basilic','Basilic miel gingembre','Citron ail','Dakatine','Creole','Cesar','Citron miel gingembre','L avocat','Chinoise','Italienne Origan Citron','Passion gingembre','Letchi Combava','Vinaigrette aux herbes'],
+  'Dessert':['Cheesecake','Mousse chocolat','Panna cotta','Tiramisu','Pudding de chia','Overnight oats','Compote granola','Cookies'],
+  'Boisson LABO':['Citron chia','Citronnade miel gingembre','Hibiscus Fruits Rouges','Matcha lemon fizz']
+};
+const LABO_STOCK_UNITS={
+  '4e gammes':'poche','Feculents':'poche','Legumes cuisines':'poche','Viande':'poche',
+  'Dressing poulet':'bidon','Dressing thon':'bidon','Vinaigrette':'bidon',
+  'Dessert':'portion','Boisson LABO':'bidon'
+};
+// Runtime stock state
+let _stockLaboState={};
+
+function renderStockLabo(tcid){
+  const tc=document.getElementById(tcid);
+  tc.innerHTML='';
+  const wrapper=document.createElement('div');wrapper.className='space-body';
+  // Date bar
+  const dateBar=document.createElement('div');dateBar.className='date-bar';
+  dateBar.innerHTML='<label>Date :</label>';
+  const di=document.createElement('input');di.type='date';di.className='date-inp';di.id='stock-labo-date';
+  di.value=new Date().toISOString().split('T')[0];
+  dateBar.appendChild(di);wrapper.appendChild(dateBar);
+  // Info
+  const info=document.createElement('div');
+  info.style.cssText='font-size:10px;color:var(--gr);margin-bottom:12px;';
+  info.textContent='Saisissez les quantites en stock et la DLC pour chaque produit. Laissez vide si stock = 0.';
+  wrapper.appendChild(info);
+  // Products by category
+  Object.keys(LABO_STOCK_CATS).forEach(cat=>{
+    const prods=LABO_STOCK_CATS[cat];
+    const unit=LABO_STOCK_UNITS[cat]||'poche';
+    // Section header (collapsible)
+    const secHead=document.createElement('div');
+    secHead.style.cssText='background:var(--g);color:var(--cr);padding:8px 12px;border-radius:8px;margin-bottom:5px;margin-top:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:1px;';
+    const arrow=document.createElement('span');arrow.textContent='▼';
+    secHead.innerHTML='<span>'+cat.toUpperCase()+'</span>';secHead.appendChild(arrow);
+    const secBody=document.createElement('div');secBody.style.display='block';
+    secHead.addEventListener('click',()=>{
+      const open=secBody.style.display!=='none';
+      secBody.style.display=open?'none':'block';
+      arrow.textContent=open?'▶':'▼';
+    });
+    prods.forEach(prod=>{
+      const key=cat+'__'+prod;
+      const existing=_stockLaboState[key]||{qty:0,dlc:''};
+      const row=document.createElement('div');
+      row.style.cssText='background:white;border:.5px solid var(--bd);border-radius:9px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+      // Nom + unité
+      const nameDiv=document.createElement('div');nameDiv.style.cssText='flex:1;min-width:120px;';
+      const nameEl=document.createElement('div');nameEl.style.cssText='font-size:11px;font-weight:700;color:#2C2C2A;';nameEl.textContent=prod;
+      const unitEl=document.createElement('div');unitEl.style.cssText='font-size:9px;color:var(--lg);';unitEl.textContent=unit;
+      nameDiv.appendChild(nameEl);nameDiv.appendChild(unitEl);
+      // Qty +/-
+      const qrow=document.createElement('div');qrow.style.cssText='display:flex;align-items:center;gap:4px;';
+      const qm=document.createElement('button');qm.type='button';qm.className='qm';qm.style.cssText='width:26px;height:26px;';qm.textContent='-';
+      const qv=document.createElement('span');qv.className='qv';qv.style.cssText='width:28px;font-size:12px;';qv.id='slq_'+key.replace(/[^a-zA-Z0-9]/g,'_');
+      qv.textContent=String(existing.qty);
+      const qp=document.createElement('button');qp.type='button';qp.className='qp';qp.style.cssText='width:26px;height:26px;';qp.textContent='+';
+      qm.addEventListener('click',()=>{
+        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
+        _stockLaboState[key].qty=Math.max(0,(_stockLaboState[key].qty||0)-1);
+        qv.textContent=String(_stockLaboState[key].qty);
+      });
+      qp.addEventListener('click',()=>{
+        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
+        _stockLaboState[key].qty=(_stockLaboState[key].qty||0)+1;
+        qv.textContent=String(_stockLaboState[key].qty);
+      });
+      qrow.appendChild(qm);qrow.appendChild(qv);qrow.appendChild(qp);
+      // DLC
+      const dlcDiv=document.createElement('div');dlcDiv.style.cssText='display:flex;align-items:center;gap:4px;';
+      const dlcLbl=document.createElement('span');dlcLbl.style.cssText='font-size:9px;color:var(--gr);white-space:nowrap;';dlcLbl.textContent='DLC :';
+      const dlcInp=document.createElement('input');dlcInp.type='date';dlcInp.id='sld_'+key.replace(/[^a-zA-Z0-9]/g,'_');
+      dlcInp.style.cssText='border:.5px solid var(--bd);border-radius:6px;padding:3px 6px;font-size:10px;color:#2C2C2A;width:120px;';
+      dlcInp.value=existing.dlc||'';
+      dlcInp.addEventListener('change',()=>{
+        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
+        _stockLaboState[key].dlc=dlcInp.value;
+        // Highlight if DLC proche (< 3 jours)
+        if(dlcInp.value){
+          const diff=(new Date(dlcInp.value)-new Date())/(1000*60*60*24);
+          dlcInp.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
+          dlcInp.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
+        }
+      });
+      // Init color
+      if(existing.dlc){
+        const diff=(new Date(existing.dlc)-new Date())/(1000*60*60*24);
+        dlcInp.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
+        dlcInp.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
+      }
+      dlcDiv.appendChild(dlcLbl);dlcDiv.appendChild(dlcInp);
+      row.appendChild(nameDiv);row.appendChild(qrow);row.appendChild(dlcDiv);
+      secBody.appendChild(row);
+    });
+    wrapper.appendChild(secHead);wrapper.appendChild(secBody);
+  });
+  // Buttons
+  const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;margin-top:14px;';
+  const saveBtn=document.createElement('button');
+  saveBtn.style.cssText='flex:2;padding:13px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--g);color:white;';
+  saveBtn.textContent='Enregistrer le stock';
+  saveBtn.addEventListener('click',()=>saveStockLabo(tcid));
+  const pdfBtn=document.createElement('button');
+  pdfBtn.style.cssText='flex:1;padding:13px;border-radius:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--or);color:white;';
+  pdfBtn.textContent='PDF';
+  pdfBtn.addEventListener('click',genStockLaboPDF);
+  btnRow.appendChild(saveBtn);btnRow.appendChild(pdfBtn);
+  wrapper.appendChild(btnRow);
+  tc.appendChild(wrapper);
+  // Load last saved stock
+  loadLastStockLabo();
+}
+
+function loadLastStockLabo(){
+  if(!db.stockLabo||!db.stockLabo.length)return;
+  const last=db.stockLabo.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0))[0];
+  if(!last||!last.items)return;
+  _stockLaboState={};
+  Object.keys(last.items).forEach(key=>{
+    _stockLaboState[key]={qty:last.items[key].qty||0,dlc:last.items[key].dlc||''};
+    const qEl=document.getElementById('slq_'+key.replace(/[^a-zA-Z0-9]/g,'_'));
+    if(qEl)qEl.textContent=String(last.items[key].qty||0);
+    const dEl=document.getElementById('sld_'+key.replace(/[^a-zA-Z0-9]/g,'_'));
+    if(dEl){
+      dEl.value=last.items[key].dlc||'';
+      if(dEl.value){
+        const diff=(new Date(dEl.value)-new Date())/(1000*60*60*24);
+        dEl.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
+        dEl.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
+      }
+    }
+  });
+}
+
+async function saveStockLabo(tcid){
+  const dateVal=document.getElementById('stock-labo-date').value;
+  const dateStr=dateVal?new Date(dateVal).toLocaleDateString('fr-FR'):new Date().toLocaleDateString('fr-FR');
+  const items={};
+  Object.keys(_stockLaboState).forEach(key=>{
+    const s=_stockLaboState[key];
+    if(s&&(s.qty>0||s.dlc))items[key]={qty:s.qty||0,dlc:s.dlc||''};
+  });
+  const entry={date:dateStr,savedAt:Date.now(),items};
+  await window.fsLib.addDoc(window.fsLib.collection(window.firestoreDB,'stock_labo'),entry);
+  alert('Stock LABO enregistre pour le '+dateStr+' !');
+}
+
+function genStockLaboPDF(){
+  const dateVal=document.getElementById('stock-labo-date');
+  const dateStr=dateVal?new Date(dateVal.value).toLocaleDateString('fr-FR'):new Date().toLocaleDateString('fr-FR');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,M=12;
+  // Header
+  doc.setFillColor(30,92,58);doc.rect(0,0,W,30,'F');
+  doc.setTextColor(245,240,232);
+  doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text('VITALY — STOCK LABO',M,14);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text('Etat du stock — '+dateStr,M,22);
+  doc.text('Genere le '+new Date().toLocaleDateString('fr-FR'),W-M,22,{align:'right'});
+  doc.setFillColor(232,97,58);doc.rect(0,30,W,2,'F');
+  let y=36;
+  // Table header
+  doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,6,'F');
+  doc.setTextColor(245,240,232);doc.setFontSize(7);doc.setFont('helvetica','bold');
+  doc.text('Produit',M+2,y+4);
+  doc.text('Unite',W-M-60,y+4,{align:'right'});
+  doc.text('Stock',W-M-30,y+4,{align:'right'});
+  doc.text('DLC',W-M,y+4,{align:'right'});
+  y+=7;
+  let rowIdx=0;
+  Object.keys(LABO_STOCK_CATS).forEach(cat=>{
+    const prods=LABO_STOCK_CATS[cat];
+    const unit=LABO_STOCK_UNITS[cat]||'poche';
+    const catProds=prods.filter(p=>{
+      const key=cat+'__'+p;
+      const s=_stockLaboState[key];
+      return s&&(s.qty>0||s.dlc);
+    });
+    if(!catProds.length)return;
+    if(y>270){doc.addPage();y=15;}
+    // Category header
+    doc.setFillColor(245,240,232);doc.rect(M,y-3,W-2*M,7,'F');
+    doc.setTextColor(30,92,58);doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.text(cat.toUpperCase(),M+2,y+1);y+=6;
+    catProds.forEach(prod=>{
+      if(y>274){doc.addPage();y=15;}
+      const key=cat+'__'+prod;
+      const s=_stockLaboState[key]||{qty:0,dlc:''};
+      if(rowIdx%2===0){doc.setFillColor(249,248,246);doc.rect(M,y-2.5,W-2*M,5,'F');}
+      else{doc.setFillColor(255,255,255);doc.rect(M,y-2.5,W-2*M,5,'F');}
+      // DLC color
+      let dlcColor=[30,30,30];
+      if(s.dlc){
+        const diff=(new Date(s.dlc)-new Date())/(1000*60*60*24);
+        if(diff<=2)dlcColor=[229,115,115];
+        else if(diff<=5)dlcColor=[232,97,58];
+      }
+      doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
+      doc.text(prod,M+2,y+1);
+      doc.text(unit,W-M-60,y+1,{align:'right'});
+      doc.setFont('helvetica','bold');
+      doc.text(String(s.qty||0),W-M-30,y+1,{align:'right'});
+      doc.setTextColor(dlcColor[0],dlcColor[1],dlcColor[2]);
+      if(s.dlc){
+        const dlcStr=new Date(s.dlc).toLocaleDateString('fr-FR');
+        doc.text(dlcStr,W-M,y+1,{align:'right'});
+      }else{doc.text('—',W-M,y+1,{align:'right'});}
+      doc.setDrawColor(230,228,222);doc.line(M,y+2.5,W-M,y+2.5);
+      y+=5;rowIdx++;
+    });
+    y+=2;
+  });
+  // Legend DLC
+  y+=4;
+  doc.setFontSize(6);
+  doc.setTextColor(229,115,115);doc.text('● DLC <= 2 jours',M,y);
+  doc.setTextColor(232,97,58);doc.text('● DLC <= 5 jours',M+30,y);
+  doc.setTextColor(180,178,169);doc.text('● DLC OK',M+60,y);
+  // Footer
+  doc.setFontSize(6);doc.setTextColor(180,178,169);doc.setFont('helvetica','normal');
+  doc.text('VITALY — Stock LABO — '+dateStr,W/2,291,{align:'center'});
+  doc.save('Stock_LABO_VITALY_'+dateStr.replace(/\//g,'-')+'.pdf');
 }
 
 function renderChefDashboard(tcid){
