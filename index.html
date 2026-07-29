@@ -1468,56 +1468,96 @@ function renderStockLabo(tcid){
     });
     prods.forEach(prod=>{
       const key=cat+'__'+prod;
-      const existing=_stockLaboState[key]||{qty:0,dlc:''};
-      const row=document.createElement('div');
-      row.style.cssText='background:white;border:.5px solid var(--bd);border-radius:9px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
-      // Nom + unité
-      const nameDiv=document.createElement('div');nameDiv.style.cssText='flex:1;min-width:120px;';
-      const nameEl=document.createElement('div');nameEl.style.cssText='font-size:11px;font-weight:700;color:#2C2C2A;';nameEl.textContent=prod;
-      const unitEl=document.createElement('div');unitEl.style.cssText='font-size:9px;color:var(--lg);';unitEl.textContent=unit;
-      nameDiv.appendChild(nameEl);nameDiv.appendChild(unitEl);
-      // Qty +/-
-      const qrow=document.createElement('div');qrow.style.cssText='display:flex;align-items:center;gap:4px;';
-      const qm=document.createElement('button');qm.type='button';qm.className='qm';qm.style.cssText='width:26px;height:26px;';qm.textContent='-';
-      const qv=document.createElement('span');qv.className='qv';qv.style.cssText='width:28px;font-size:12px;';qv.id='slq_'+key.replace(/[^a-zA-Z0-9]/g,'_');
-      qv.textContent=String(existing.qty);
-      const qp=document.createElement('button');qp.type='button';qp.className='qp';qp.style.cssText='width:26px;height:26px;';qp.textContent='+';
-      qm.addEventListener('click',()=>{
-        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
-        _stockLaboState[key].qty=Math.max(0,(_stockLaboState[key].qty||0)-1);
-        qv.textContent=String(_stockLaboState[key].qty);
-      });
-      qp.addEventListener('click',()=>{
-        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
-        _stockLaboState[key].qty=(_stockLaboState[key].qty||0)+1;
-        qv.textContent=String(_stockLaboState[key].qty);
-      });
-      qrow.appendChild(qm);qrow.appendChild(qv);qrow.appendChild(qp);
-      // DLC
-      const dlcDiv=document.createElement('div');dlcDiv.style.cssText='display:flex;align-items:center;gap:4px;';
-      const dlcLbl=document.createElement('span');dlcLbl.style.cssText='font-size:9px;color:var(--gr);white-space:nowrap;';dlcLbl.textContent='DLC :';
-      const dlcInp=document.createElement('input');dlcInp.type='date';dlcInp.id='sld_'+key.replace(/[^a-zA-Z0-9]/g,'_');
-      dlcInp.style.cssText='border:.5px solid var(--bd);border-radius:6px;padding:3px 6px;font-size:10px;color:#2C2C2A;width:120px;';
-      dlcInp.value=existing.dlc||'';
-      dlcInp.addEventListener('change',()=>{
-        _stockLaboState[key]=_stockLaboState[key]||{qty:0,dlc:''};
-        _stockLaboState[key].dlc=dlcInp.value;
-        // Highlight if DLC proche (< 3 jours)
-        if(dlcInp.value){
-          const diff=(new Date(dlcInp.value)-new Date())/(1000*60*60*24);
-          dlcInp.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
-          dlcInp.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
-        }
-      });
-      // Init color
-      if(existing.dlc){
-        const diff=(new Date(existing.dlc)-new Date())/(1000*60*60*24);
-        dlcInp.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
-        dlcInp.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
+      if(!_stockLaboState[key])_stockLaboState[key]={lines:[{qty:0,dlc:''}]};
+      // Card container
+      const card=document.createElement('div');
+      card.style.cssText='background:white;border:.5px solid var(--bd);border-radius:9px;padding:9px 12px;margin-bottom:5px;';
+      // Product name
+      const nameRow=document.createElement('div');nameRow.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;';
+      const nameEl=document.createElement('span');nameEl.style.cssText='font-size:11px;font-weight:700;color:#2C2C2A;';nameEl.textContent=prod;
+      const unitEl=document.createElement('span');unitEl.style.cssText='font-size:9px;color:var(--lg);background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px;';unitEl.textContent=unit;
+      nameRow.appendChild(nameEl);nameRow.appendChild(unitEl);
+      card.appendChild(nameRow);
+      // Lines container
+      const linesDiv=document.createElement('div');linesDiv.id='lines_'+key.replace(/[^a-zA-Z0-9]/g,'_');
+      function applyDlcColor(inp,val){
+        if(!val){inp.style.borderColor='var(--bd)';inp.style.color='#2C2C2A';inp.style.background='white';return;}
+        const diff=(new Date(val)-new Date())/(1000*60*60*24);
+        if(diff<=1){inp.style.borderColor='#C62828';inp.style.color='#C62828';inp.style.background='#FFEBEB';}
+        else if(diff<=3){inp.style.borderColor='var(--or)';inp.style.color='var(--or)';inp.style.background='#FFF5EB';}
+        else if(diff<=7){inp.style.borderColor='#7CB342';inp.style.color='#558B2F';inp.style.background='white';}
+        else{inp.style.borderColor='var(--bd)';inp.style.color='#2C2C2A';inp.style.background='white';}
       }
-      dlcDiv.appendChild(dlcLbl);dlcDiv.appendChild(dlcInp);
-      row.appendChild(nameDiv);row.appendChild(qrow);row.appendChild(dlcDiv);
-      secBody.appendChild(row);
+      function buildLine(lineIdx){
+        const lineData=(_stockLaboState[key].lines||[])[lineIdx]||{qty:0,dlc:''};
+        const lineRow=document.createElement('div');
+        lineRow.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;';
+        // Qty
+        const qrow=document.createElement('div');qrow.style.cssText='display:flex;align-items:center;gap:4px;';
+        const qm=document.createElement('button');qm.type='button';qm.className='qm';qm.style.cssText='width:26px;height:26px;';qm.textContent='-';
+        const qv=document.createElement('span');qv.className='qv';qv.style.cssText='width:28px;font-size:12px;';
+        qv.textContent=String(lineData.qty||0);
+        const qp=document.createElement('button');qp.type='button';qp.className='qp';qp.style.cssText='width:26px;height:26px;';qp.textContent='+';
+        qm.addEventListener('click',()=>{
+          if(!_stockLaboState[key].lines[lineIdx])_stockLaboState[key].lines[lineIdx]={qty:0,dlc:''};
+          _stockLaboState[key].lines[lineIdx].qty=Math.max(0,(_stockLaboState[key].lines[lineIdx].qty||0)-1);
+          qv.textContent=String(_stockLaboState[key].lines[lineIdx].qty);
+          updateTotal();
+        });
+        qp.addEventListener('click',()=>{
+          if(!_stockLaboState[key].lines[lineIdx])_stockLaboState[key].lines[lineIdx]={qty:0,dlc:''};
+          _stockLaboState[key].lines[lineIdx].qty=(_stockLaboState[key].lines[lineIdx].qty||0)+1;
+          qv.textContent=String(_stockLaboState[key].lines[lineIdx].qty);
+          updateTotal();
+        });
+        qrow.appendChild(qm);qrow.appendChild(qv);qrow.appendChild(qp);
+        // DLC
+        const dlcLbl=document.createElement('span');dlcLbl.style.cssText='font-size:9px;color:var(--gr);white-space:nowrap;';dlcLbl.textContent='DLC :';
+        const dlcInp=document.createElement('input');dlcInp.type='date';
+        dlcInp.style.cssText='border:.5px solid var(--bd);border-radius:6px;padding:3px 6px;font-size:10px;color:#2C2C2A;width:120px;';
+        dlcInp.value=lineData.dlc||'';
+        if(lineData.dlc)applyDlcColor(dlcInp,lineData.dlc);
+        dlcInp.addEventListener('change',()=>{
+          if(!_stockLaboState[key].lines[lineIdx])_stockLaboState[key].lines[lineIdx]={qty:0,dlc:''};
+          _stockLaboState[key].lines[lineIdx].dlc=dlcInp.value;
+          applyDlcColor(dlcInp,dlcInp.value);
+        });
+        // Delete line button (only if >1 line)
+        const delBtn=document.createElement('button');delBtn.type='button';
+        delBtn.style.cssText='background:none;border:none;font-size:14px;color:#E57373;cursor:pointer;padding:0 2px;';
+        delBtn.textContent='×';
+        delBtn.addEventListener('click',()=>{
+          _stockLaboState[key].lines.splice(lineIdx,1);
+          if(_stockLaboState[key].lines.length===0)_stockLaboState[key].lines=[{qty:0,dlc:''}];
+          rebuildLines();
+          updateTotal();
+        });
+        lineRow.appendChild(qrow);lineRow.appendChild(dlcLbl);lineRow.appendChild(dlcInp);lineRow.appendChild(delBtn);
+        return lineRow;
+      }
+      function rebuildLines(){
+        linesDiv.innerHTML='';
+        (_stockLaboState[key].lines||[{qty:0,dlc:''}]).forEach((_,i)=>linesDiv.appendChild(buildLine(i)));
+      }
+      // Total display
+      const totalDiv=document.createElement('div');totalDiv.style.cssText='font-size:10px;color:var(--g);font-weight:700;margin-top:2px;';
+      function updateTotal(){
+        const total=(_stockLaboState[key].lines||[]).reduce((s,l)=>s+(l.qty||0),0);
+        totalDiv.textContent=total>0?'Total : '+total+' '+unit+(total>1?'s':''):'';
+      }
+      // Add line button
+      const addLineBtn=document.createElement('button');addLineBtn.type='button';
+      addLineBtn.style.cssText='background:none;border:.5px dashed var(--g);border-radius:6px;font-size:10px;color:var(--g);padding:3px 8px;cursor:pointer;margin-top:2px;';
+      addLineBtn.textContent='+ Ajouter une DLC';
+      addLineBtn.addEventListener('click',()=>{
+        _stockLaboState[key].lines.push({qty:0,dlc:''});
+        rebuildLines();
+        updateTotal();
+      });
+      rebuildLines();
+      updateTotal();
+      card.appendChild(linesDiv);card.appendChild(totalDiv);card.appendChild(addLineBtn);
+      secBody.appendChild(card);
     });
     wrapper.appendChild(secHead);wrapper.appendChild(secBody);
   });
@@ -1542,19 +1582,12 @@ function loadLastStockLabo(){
   if(!db.stockLabo||!db.stockLabo.length)return;
   const last=db.stockLabo.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0))[0];
   if(!last||!last.items)return;
-  _stockLaboState={};
   Object.keys(last.items).forEach(key=>{
-    _stockLaboState[key]={qty:last.items[key].qty||0,dlc:last.items[key].dlc||''};
-    const qEl=document.getElementById('slq_'+key.replace(/[^a-zA-Z0-9]/g,'_'));
-    if(qEl)qEl.textContent=String(last.items[key].qty||0);
-    const dEl=document.getElementById('sld_'+key.replace(/[^a-zA-Z0-9]/g,'_'));
-    if(dEl){
-      dEl.value=last.items[key].dlc||'';
-      if(dEl.value){
-        const diff=(new Date(dEl.value)-new Date())/(1000*60*60*24);
-        dEl.style.borderColor=diff<=2?'#E57373':diff<=5?'var(--or)':'var(--bd)';
-        dEl.style.color=diff<=2?'#E57373':diff<=5?'var(--or)':'#2C2C2A';
-      }
+    const item=last.items[key];
+    if(item.lines){
+      _stockLaboState[key]={lines:item.lines};
+    } else if(item.qty||item.dlc){
+      _stockLaboState[key]={lines:[{qty:item.qty||0,dlc:item.dlc||''}]};
     }
   });
 }
@@ -1565,7 +1598,9 @@ async function saveStockLabo(tcid){
   const items={};
   Object.keys(_stockLaboState).forEach(key=>{
     const s=_stockLaboState[key];
-    if(s&&(s.qty>0||s.dlc))items[key]={qty:s.qty||0,dlc:s.dlc||''};
+    if(!s)return;
+    const lines=(s.lines||[]).filter(l=>l.qty>0||l.dlc);
+    if(lines.length>0)items[key]={lines};
   });
   const entry={date:dateStr,savedAt:Date.now(),items};
   await window.fsLib.addDoc(window.fsLib.collection(window.firestoreDB,'stock_labo'),entry);
@@ -1587,12 +1622,13 @@ function genStockLaboPDF(){
   doc.setFillColor(232,97,58);doc.rect(0,30,W,2,'F');
   let y=36;
   // Table header
+  const C1=M+2,C2=130,C3=155,C4=W-M;
   doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,6,'F');
   doc.setTextColor(245,240,232);doc.setFontSize(7);doc.setFont('helvetica','bold');
-  doc.text('Produit',M+2,y+4);
-  doc.text('Unite',W-M-60,y+4,{align:'right'});
-  doc.text('Stock',W-M-30,y+4,{align:'right'});
-  doc.text('DLC',W-M,y+4,{align:'right'});
+  doc.text('Produit',C1,y+4);
+  doc.text('Unite',C2,y+4);
+  doc.text('Stock',C3,y+4,{align:'right'});
+  doc.text('DLC',C4,y+4,{align:'right'});
   y+=7;
   let rowIdx=0;
   Object.keys(LABO_STOCK_CATS).forEach(cat=>{
@@ -1601,7 +1637,9 @@ function genStockLaboPDF(){
     const catProds=prods.filter(p=>{
       const key=cat+'__'+p;
       const s=_stockLaboState[key];
-      return s&&(s.qty>0||s.dlc);
+      if(!s)return false;
+      if(s.lines)return s.lines.some(l=>l.qty>0||l.dlc);
+      return s.qty>0||s.dlc;
     });
     if(!catProds.length)return;
     if(y>270){doc.addPage();y=15;}
@@ -1610,39 +1648,56 @@ function genStockLaboPDF(){
     doc.setTextColor(30,92,58);doc.setFontSize(8);doc.setFont('helvetica','bold');
     doc.text(cat.toUpperCase(),M+2,y+1);y+=6;
     catProds.forEach(prod=>{
-      if(y>274){doc.addPage();y=15;}
       const key=cat+'__'+prod;
-      const s=_stockLaboState[key]||{qty:0,dlc:''};
-      if(rowIdx%2===0){doc.setFillColor(249,248,246);doc.rect(M,y-2.5,W-2*M,5,'F');}
-      else{doc.setFillColor(255,255,255);doc.rect(M,y-2.5,W-2*M,5,'F');}
-      // DLC color
-      let dlcColor=[30,30,30];
-      if(s.dlc){
-        const diff=(new Date(s.dlc)-new Date())/(1000*60*60*24);
-        if(diff<=2)dlcColor=[229,115,115];
-        else if(diff<=5)dlcColor=[232,97,58];
-      }
-      doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(7);
-      doc.text(prod,M+2,y+1);
-      doc.text(unit,W-M-60,y+1,{align:'right'});
-      doc.setFont('helvetica','bold');
-      doc.text(String(s.qty||0),W-M-30,y+1,{align:'right'});
-      doc.setTextColor(dlcColor[0],dlcColor[1],dlcColor[2]);
-      if(s.dlc){
-        const dlcStr=new Date(s.dlc).toLocaleDateString('fr-FR');
-        doc.text(dlcStr,W-M,y+1,{align:'right'});
-      }else{doc.text('—',W-M,y+1,{align:'right'});}
-      doc.setDrawColor(230,228,222);doc.line(M,y+2.5,W-M,y+2.5);
-      y+=5;rowIdx++;
+      const s=_stockLaboState[key]||{lines:[{qty:0,dlc:''}]};
+      const prodLines=(s.lines||[{qty:s.qty||0,dlc:s.dlc||''}]).filter(l=>l.qty>0||l.dlc);
+      if(!prodLines.length)return;
+      if(y>270){doc.addPage();y=15;}
+      const totalQty=prodLines.reduce((sum,l)=>sum+(l.qty||0),0);
+      doc.setFillColor(240,245,242);doc.rect(M,y-2.5,W-2*M,6,'F');
+      doc.setTextColor(30,92,58);doc.setFont('helvetica','bold');doc.setFontSize(7);
+      doc.text(prod,C1,y+1.5);
+      doc.text(unit+(totalQty>1?'s':''),C2,y+1.5);
+      doc.text('Total : '+totalQty,C3,y+1.5,{align:'right'});
+      doc.setDrawColor(200,220,210);doc.line(M,y+3.5,W-M,y+3.5);
+      y+=6;
+      prodLines.forEach((line,li)=>{
+        if(y>274){doc.addPage();y=15;}
+        let dlcColor=[80,80,80];let dlcBg=null;
+        if(line.dlc){
+          const diff=(new Date(line.dlc)-new Date())/(1000*60*60*24);
+          if(diff<=1){dlcColor=[198,40,40];dlcBg=[255,235,235];}
+          else if(diff<=3){dlcColor=[232,97,58];dlcBg=[255,245,235];}
+          else if(diff<=7){dlcColor=[100,130,50];}
+        }
+        if(dlcBg){doc.setFillColor(dlcBg[0],dlcBg[1],dlcBg[2]);}
+        else{doc.setFillColor(li%2===0?249:255,li%2===0?249:255,li%2===0?249:255);}
+        doc.rect(M,y-2.5,W-2*M,5,'F');
+        doc.setTextColor(100,100,100);doc.setFont('helvetica','normal');doc.setFontSize(7);
+        doc.text(prodLines.length>1?'  Lot '+(li+1):'  ',C1,y+1);
+        doc.setTextColor(30,30,30);doc.setFont('helvetica','bold');
+        doc.text(String(line.qty||0),C3,y+1,{align:'right'});
+        doc.setTextColor(dlcColor[0],dlcColor[1],dlcColor[2]);
+        doc.text(line.dlc?new Date(line.dlc).toLocaleDateString('fr-FR'):'—',C4,y+1,{align:'right'});
+        doc.setDrawColor(235,233,228);doc.line(M+4,y+2.5,W-M,y+2.5);
+        y+=5;rowIdx++;
+      });
+      y+=1;
     });
     y+=2;
   });
   // Legend DLC
   y+=4;
-  doc.setFontSize(6);
-  doc.setTextColor(229,115,115);doc.text('● DLC <= 2 jours',M,y);
-  doc.setTextColor(232,97,58);doc.text('● DLC <= 5 jours',M+30,y);
-  doc.setTextColor(180,178,169);doc.text('● DLC OK',M+60,y);
+  // Legend
+  doc.setFontSize(6);doc.setFont('helvetica','bold');
+  doc.setFillColor(198,40,40);doc.rect(M,y-2,3,3,'F');
+  doc.setTextColor(198,40,40);doc.text('URGENT <= 1 jour',M+4,y);
+  doc.setFillColor(232,97,58);doc.rect(M+42,y-2,3,3,'F');
+  doc.setTextColor(232,97,58);doc.text('ATTENTION <= 3 jours',M+46,y);
+  doc.setFillColor(100,130,50);doc.rect(M+90,y-2,3,3,'F');
+  doc.setTextColor(100,130,50);doc.text('OK <= 7 jours',M+94,y);
+  doc.setFillColor(30,30,30);doc.rect(M+120,y-2,3,3,'F');
+  doc.setTextColor(30,30,30);doc.text('> 7 jours',M+124,y);
   // Footer
   doc.setFontSize(6);doc.setTextColor(180,178,169);doc.setFont('helvetica','normal');
   doc.text('VITALY — Stock LABO — '+dateStr,W/2,291,{align:'center'});
