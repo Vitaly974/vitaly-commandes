@@ -2380,7 +2380,15 @@ function previewFacture(tcid){
   totalDiv.style.cssText='border:.5px solid var(--bd);border-top:none;padding:10px 12px;background:white;border-radius:0 0 12px 12px;';
   function updateTotals(){
     let tHT=0;
-    factLines.forEach(l=>{if(window._factChecked[l.key])tHT+=l.qty*(l.puHT||0);});
+    factLines.forEach(l=>{
+      if(window._factChecked[l.key]===false)return;
+      const qty=window._factQtys[l.key]||0;
+      const lineTotal=qty*(l.puHT||0);
+      tHT+=lineTotal;
+      // Update line total display
+      const totEl=document.getElementById('fact-tot-'+l.key.replace(/[^a-zA-Z0-9]/g,'_'));
+      if(totEl)totEl.textContent=lineTotal>0?lineTotal.toFixed(2)+' €':'—';
+    });
     const tva=tHT*TVA_RATE;
     const ttc=tHT+tva;
     totalDiv.innerHTML=
@@ -2388,22 +2396,66 @@ function previewFacture(tcid){
       '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">TVA (2,10%)</span><span>'+tva.toFixed(2)+' €</span></div>'+
       '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--g);border-top:.5px solid var(--bd);padding-top:8px;margin-top:4px;"><span>TOTAL TTC</span><span>'+ttc.toFixed(2)+' €</span></div>';
   }
+  // Store editable quantities
+  window._factQtys={};
+  factLines.forEach(l=>{window._factQtys[l.key]=l.qty;});
+
   factLines.forEach((l,idx)=>{
-    const lineTotal=l.qty*(l.puHT||0);
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:24px 1fr 60px 70px 75px;gap:4px;padding:7px 12px;font-size:11px;align-items:center;'+(idx%2===0?'background:rgba(0,0,0,.02)':'background:white')+';';
+    row.style.cssText='display:grid;grid-template-columns:24px 1fr auto 70px 75px;gap:4px;padding:6px 12px;font-size:11px;align-items:center;border-bottom:.5px solid rgba(0,0,0,.05);'+(idx%2===0?'background:rgba(0,0,0,.02)':'background:white')+';';
+    // Checkbox
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;
     cb.style.cssText='width:14px;height:14px;cursor:pointer;accent-color:var(--g);';
     cb.addEventListener('change',()=>{
       window._factChecked[l.key]=cb.checked;
-      row.style.opacity=cb.checked?'1':'0.4';
+      row.style.opacity=cb.checked?'1':'0.35';
       updateTotals();
     });
-    const nameEl=document.createElement('div');nameEl.style.cssText='color:#2C2C2A;';nameEl.textContent=l.name;
-    const qtyEl=document.createElement('div');qtyEl.style.cssText='text-align:right;color:var(--g);font-weight:600;';qtyEl.textContent=l.qty+' '+(l.qty>1?(l.unit==='poche'?'poches':l.unit+'s'):l.unit);
-    const puEl=document.createElement('div');puEl.style.cssText='text-align:right;color:var(--gr);';puEl.textContent=l.puHT?l.puHT.toFixed(2)+' €':'—';
-    const totEl=document.createElement('div');totEl.style.cssText='text-align:right;font-weight:700;color:#2C2C2A;';totEl.textContent=lineTotal>0?lineTotal.toFixed(2)+' €':'—';
-    row.appendChild(cb);row.appendChild(nameEl);row.appendChild(qtyEl);row.appendChild(puEl);row.appendChild(totEl);
+    // Name
+    const nameEl=document.createElement('div');nameEl.style.cssText='color:#2C2C2A;font-size:11px;';nameEl.textContent=l.name;
+    // Qty editor: - input +
+    const qtyWrap=document.createElement('div');qtyWrap.style.cssText='display:flex;align-items:center;gap:3px;';
+    const qm=document.createElement('button');qm.type='button';qm.className='qm';qm.style.cssText='width:22px;height:22px;font-size:13px;';qm.textContent='-';
+    const qInp=document.createElement('input');qInp.type='number';qInp.min='0';
+    qInp.value=String(l.qty);
+    qInp.style.cssText='width:36px;text-align:center;border:.5px solid var(--bd);border-radius:5px;padding:2px 4px;font-size:11px;font-weight:700;color:var(--g);';
+    const qp=document.createElement('button');qp.type='button';qp.className='qp';qp.style.cssText='width:22px;height:22px;font-size:13px;';qp.textContent='+';
+    const unitLbl=document.createElement('span');unitLbl.style.cssText='font-size:9px;color:var(--lg);white-space:nowrap;';
+    function updateUnitLabel(q){
+      unitLbl.textContent=q>1?(l.unit==='poche'?'poches':l.unit+'s'):l.unit;
+    }
+    updateUnitLabel(l.qty);
+    qm.addEventListener('click',()=>{
+      const cur=parseInt(qInp.value)||0;
+      if(cur<=0)return;
+      qInp.value=String(cur-1);
+      window._factQtys[l.key]=cur-1;
+      updateUnitLabel(cur-1);
+      updateTotals();
+    });
+    qp.addEventListener('click',()=>{
+      const cur=parseInt(qInp.value)||0;
+      qInp.value=String(cur+1);
+      window._factQtys[l.key]=cur+1;
+      updateUnitLabel(cur+1);
+      updateTotals();
+    });
+    qInp.addEventListener('change',()=>{
+      const val=Math.max(0,parseInt(qInp.value)||0);
+      qInp.value=String(val);
+      window._factQtys[l.key]=val;
+      updateUnitLabel(val);
+      updateTotals();
+    });
+    qtyWrap.appendChild(qm);qtyWrap.appendChild(qInp);qtyWrap.appendChild(qp);qtyWrap.appendChild(unitLbl);
+    // PU HT
+    const puEl=document.createElement('div');puEl.style.cssText='text-align:right;color:var(--gr);font-size:10px;';puEl.textContent=l.puHT?l.puHT.toFixed(2)+' €':'—';
+    // Total HT (dynamic)
+    const totEl=document.createElement('div');totEl.style.cssText='text-align:right;font-weight:700;color:#2C2C2A;font-size:11px;';
+    totEl.id='fact-tot-'+l.key.replace(/[^a-zA-Z0-9]/g,'_');
+    const initTotal=l.qty*(l.puHT||0);
+    totEl.textContent=initTotal>0?initTotal.toFixed(2)+' €':'—';
+    row.appendChild(cb);row.appendChild(nameEl);row.appendChild(qtyWrap);row.appendChild(puEl);row.appendChild(totEl);
     linesContainer.appendChild(row);
   });
   prevDiv.appendChild(linesContainer);
@@ -2441,7 +2493,11 @@ function genFacturePDF(sk,startVal,endVal,factNum){
   // Use lines from preview, filtered by checkboxes
   const allLines=window._factLines||[];
   const checked=window._factChecked||{};
-  const lines=allLines.filter(l=>checked[l.key]!==false);
+  const qtys=window._factQtys||{};
+  const lines=allLines
+    .filter(l=>checked[l.key]!==false)
+    .map(l=>({...l,qty:qtys[l.key]!==undefined?qtys[l.key]:l.qty}))
+    .filter(l=>l.qty>0);
   const storeName=window._factParams?window._factParams.storeName:STORE_NAMES[sk];
   const startStr=window._factParams?window._factParams.startStr:new Date(startVal).toLocaleDateString('fr-FR');
   const endStr=window._factParams?window._factParams.endStr:new Date(endVal).toLocaleDateString('fr-FR');
