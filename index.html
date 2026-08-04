@@ -2325,13 +2325,11 @@ function previewFacture(tcid){
   if(!startVal||!endVal){alert('Veuillez sélectionner une période.');return;}
   const startDate=new Date(startVal);
   const endDate=new Date(endVal);endDate.setHours(23,59,59);
-  // Filter chef_history for this PDV and period - LABO only
   const orders=db.chefHistory.filter(o=>{
     if(o.storeKey!==sk)return false;
     const oDate=new Date(o.treatedAt||0);
     return oDate>=startDate&&oDate<=endDate;
   });
-  // Build product totals from LABO quantities
   const totals={};
   orders.forEach(o=>{
     Object.keys(o.quantities||{}).forEach(key=>{
@@ -2339,58 +2337,90 @@ function previewFacture(tcid){
       const[cat,i]=key.split('__');
       if(cat!=='LABO')return;
       const p=(PRODUCTS['LABO']||[])[parseInt(i)];if(!p)return;
-      if(!totals[key])totals[key]={name:p.name,unit:p.unit,qty:0,puHT:getPrice(key)};
+      if(!totals[key])totals[key]={name:p.name,unit:p.unit,qty:0,puHT:getPrice(key),key};
       totals[key].qty+=q;
     });
   });
-  const lines=Object.values(totals).filter(l=>l.qty>0);
+  const factLines=Object.values(totals).filter(l=>l.qty>0);
   const prevDiv=document.getElementById('fact-preview');
-  if(!lines.length){
+  if(!factLines.length){
     prevDiv.innerHTML='<div style="background:rgba(232,97,58,.08);border-radius:9px;padding:14px;font-size:12px;color:var(--or);text-align:center;margin-top:8px;">Aucune commande LABO traitée pour ce PDV sur cette période.</div>';
     return;
   }
-  // Build preview table
   const storeName=STORE_NAMES[sk];
   const startStr=startDate.toLocaleDateString('fr-FR');
   const endStr=new Date(endVal).toLocaleDateString('fr-FR');
   const factNum=getFactureNum();
-  let totalHT=0;
-  lines.forEach(l=>{totalHT+=l.qty*(l.puHT||0);});
-  const tva=totalHT*TVA_RATE;
-  const ttc=totalHT+tva;
-  let html='<div style="background:white;border:.5px solid var(--bd);border-radius:12px;overflow:hidden;margin-top:4px;">';
-  html+='<div style="background:var(--g);padding:14px 16px;color:white;">';
-  html+='<div style="font-size:16px;font-weight:800;letter-spacing:2px;">VITALY LABO</div>';
-  html+='<div style="font-size:10px;opacity:.8;margin-top:2px;">Facture '+factNum+'</div>';
-  html+='<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;">';
-  html+='<div><div style="opacity:.7;font-size:9px;">CLIENT</div><div style="font-weight:700;">'+storeName.toUpperCase()+'</div></div>';
-  html+='<div style="text-align:right;"><div style="opacity:.7;font-size:9px;">PÉRIODE</div><div style="font-weight:700;">'+startStr+' → '+endStr+'</div></div>';
-  html+='</div></div>';
+  // Store lines in global for PDF generation
+  window._factLines=factLines;
+  window._factChecked={}; factLines.forEach(l=>window._factChecked[l.key]=true);
+  window._factParams={sk,startVal,endVal,factNum,storeName,startStr,endStr};
+  // Build interactive preview using DOM
+  prevDiv.innerHTML='';
+  // Header card
+  const headerDiv=document.createElement('div');
+  headerDiv.style.cssText='background:var(--g);padding:14px 16px;border-radius:12px 12px 0 0;color:white;margin-top:4px;';
+  headerDiv.innerHTML='<div style="font-size:15px;font-weight:800;letter-spacing:2px;">FOODPROD → '+storeName.toUpperCase()+'</div>'+
+    '<div style="font-size:10px;opacity:.8;margin-top:3px;">'+factNum+' — '+startStr+' au '+endStr+'</div>';
+  prevDiv.appendChild(headerDiv);
+  // Info
+  const infoDiv=document.createElement('div');
+  infoDiv.style.cssText='background:rgba(30,92,58,.06);padding:8px 12px;font-size:10px;color:var(--g);border:.5px solid rgba(30,92,58,.15);';
+  infoDiv.innerHTML='<strong>Décochez</strong> les produits à exclure de la facture.';
+  prevDiv.appendChild(infoDiv);
   // Table header
-  html+='<div style="display:grid;grid-template-columns:1fr 60px 70px 75px;gap:4px;padding:7px 12px;background:rgba(30,92,58,.06);font-size:9px;font-weight:700;color:var(--g);letter-spacing:1px;">';
-  html+='<div>PRODUIT</div><div style="text-align:right;">QTÉ</div><div style="text-align:right;">PU HT</div><div style="text-align:right;">TOTAL HT</div></div>';
-  // Lines
-  lines.forEach((l,idx)=>{
+  const thDiv=document.createElement('div');
+  thDiv.style.cssText='display:grid;grid-template-columns:24px 1fr 60px 70px 75px;gap:4px;padding:7px 12px;background:rgba(30,92,58,.08);font-size:9px;font-weight:700;color:var(--g);letter-spacing:1px;';
+  thDiv.innerHTML='<div></div><div>PRODUIT</div><div style="text-align:right;">QTÉ</div><div style="text-align:right;">PU HT</div><div style="text-align:right;">TOTAL HT</div>';
+  prevDiv.appendChild(thDiv);
+  // Lines with checkboxes
+  const linesContainer=document.createElement('div');
+  linesContainer.style.cssText='background:white;border:.5px solid var(--bd);border-radius:0;';
+  const totalDiv=document.createElement('div');
+  totalDiv.style.cssText='border:.5px solid var(--bd);border-top:none;padding:10px 12px;background:white;border-radius:0 0 12px 12px;';
+  function updateTotals(){
+    let tHT=0;
+    factLines.forEach(l=>{if(window._factChecked[l.key])tHT+=l.qty*(l.puHT||0);});
+    const tva=tHT*TVA_RATE;
+    const ttc=tHT+tva;
+    totalDiv.innerHTML=
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">Total HT</span><span style="font-weight:700;">'+tHT.toFixed(2)+' €</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">TVA (2,10%)</span><span>'+tva.toFixed(2)+' €</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--g);border-top:.5px solid var(--bd);padding-top:8px;margin-top:4px;"><span>TOTAL TTC</span><span>'+ttc.toFixed(2)+' €</span></div>';
+  }
+  factLines.forEach((l,idx)=>{
     const lineTotal=l.qty*(l.puHT||0);
-    html+='<div style="display:grid;grid-template-columns:1fr 60px 70px 75px;gap:4px;padding:7px 12px;font-size:11px;'+(idx%2===0?'background:rgba(0,0,0,.02)':'')+';">';
-    html+='<div style="color:#2C2C2A;">'+l.name+'</div>';
-    html+='<div style="text-align:right;color:var(--g);font-weight:600;">'+l.qty+' '+l.unit+'</div>';
-    html+='<div style="text-align:right;color:var(--gr);">'+(l.puHT?l.puHT.toFixed(2)+' €':'—')+'</div>';
-    html+='<div style="text-align:right;font-weight:700;color:#2C2C2A;">'+(lineTotal>0?lineTotal.toFixed(2)+' €':'—')+'</div>';
-    html+='</div>';
+    const row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:24px 1fr 60px 70px 75px;gap:4px;padding:7px 12px;font-size:11px;align-items:center;'+(idx%2===0?'background:rgba(0,0,0,.02)':'background:white')+';';
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;
+    cb.style.cssText='width:14px;height:14px;cursor:pointer;accent-color:var(--g);';
+    cb.addEventListener('change',()=>{
+      window._factChecked[l.key]=cb.checked;
+      row.style.opacity=cb.checked?'1':'0.4';
+      updateTotals();
+    });
+    const nameEl=document.createElement('div');nameEl.style.cssText='color:#2C2C2A;';nameEl.textContent=l.name;
+    const qtyEl=document.createElement('div');qtyEl.style.cssText='text-align:right;color:var(--g);font-weight:600;';qtyEl.textContent=l.qty+' '+(l.qty>1?(l.unit==='poche'?'poches':l.unit+'s'):l.unit);
+    const puEl=document.createElement('div');puEl.style.cssText='text-align:right;color:var(--gr);';puEl.textContent=l.puHT?l.puHT.toFixed(2)+' €':'—';
+    const totEl=document.createElement('div');totEl.style.cssText='text-align:right;font-weight:700;color:#2C2C2A;';totEl.textContent=lineTotal>0?lineTotal.toFixed(2)+' €':'—';
+    row.appendChild(cb);row.appendChild(nameEl);row.appendChild(qtyEl);row.appendChild(puEl);row.appendChild(totEl);
+    linesContainer.appendChild(row);
   });
-  // Totals
-  html+='<div style="border-top:.5px solid var(--bd);padding:10px 12px;">';
-  html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">Total HT</span><span style="font-weight:700;">'+totalHT.toFixed(2)+' €</span></div>';
-  html+='<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="color:var(--gr);">TVA (2,10%)</span><span>'+tva.toFixed(2)+' €</span></div>';
-  html+='<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--g);border-top:.5px solid var(--bd);padding-top:8px;margin-top:4px;"><span>TOTAL TTC</span><span>'+ttc.toFixed(2)+' €</span></div>';
-  html+='</div></div>';
-  // Download button
-  html+='<div style="display:flex;gap:8px;margin-top:10px;">';
-  html+='<button onclick="genFacturePDF(\''+sk+'\',\''+startVal+'\',\''+endVal+'\',\''+factNum+'\')" style="flex:2;padding:13px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--or);color:white;">📄 Télécharger PDF</button>';
-  html+='<button onclick="deleteFacture()" style="flex:1;padding:13px;border-radius:10px;border:.5px solid #E57373;font-size:12px;font-weight:700;cursor:pointer;background:white;color:#E57373;">🗑 Supprimer</button>';
-  html+='</div>';
-  prevDiv.innerHTML=html;
+  prevDiv.appendChild(linesContainer);
+  updateTotals();
+  prevDiv.appendChild(totalDiv);
+  // Buttons
+  const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;margin-top:10px;';
+  const dlBtn=document.createElement('button');
+  dlBtn.style.cssText='flex:2;padding:13px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--or);color:white;';
+  dlBtn.textContent='Télécharger PDF';
+  dlBtn.addEventListener('click',()=>genFacturePDF(window._factParams.sk,window._factParams.startVal,window._factParams.endVal,window._factParams.factNum));
+  const delBtn=document.createElement('button');
+  delBtn.style.cssText='flex:1;padding:13px;border-radius:10px;border:.5px solid #E57373;font-size:12px;font-weight:700;cursor:pointer;background:white;color:#E57373;';
+  delBtn.textContent='Supprimer';
+  delBtn.addEventListener('click',deleteFacture);
+  btnRow.appendChild(dlBtn);btnRow.appendChild(delBtn);
+  prevDiv.appendChild(btnRow);
 }
 
 function deleteFacture(){
@@ -2408,31 +2438,16 @@ function deleteFacture(){
 }
 
 function genFacturePDF(sk,startVal,endVal,factNum){
-  const startDate=new Date(startVal);
-  const endDate=new Date(endVal);endDate.setHours(23,59,59);
-  const orders=db.chefHistory.filter(o=>{
-    if(o.storeKey!==sk)return false;
-    const oDate=new Date(o.treatedAt||0);
-    return oDate>=startDate&&oDate<=endDate;
-  });
-  const totals={};
-  orders.forEach(o=>{
-    Object.keys(o.quantities||{}).forEach(key=>{
-      const q=o.quantities[key];if(!q)return;
-      const[cat,i]=key.split('__');
-      if(cat!=='LABO')return;
-      const p=(PRODUCTS['LABO']||[])[parseInt(i)];if(!p)return;
-      if(!totals[key])totals[key]={name:p.name,unit:p.unit,qty:0,puHT:getPrice(key)};
-      totals[key].qty+=q;
-    });
-  });
-  const lines=Object.values(totals).filter(l=>l.qty>0);
+  // Use lines from preview, filtered by checkboxes
+  const allLines=window._factLines||[];
+  const checked=window._factChecked||{};
+  const lines=allLines.filter(l=>checked[l.key]!==false);
+  const storeName=window._factParams?window._factParams.storeName:STORE_NAMES[sk];
+  const startStr=window._factParams?window._factParams.startStr:new Date(startVal).toLocaleDateString('fr-FR');
+  const endStr=window._factParams?window._factParams.endStr:new Date(endVal).toLocaleDateString('fr-FR');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=210,M=12;
-  const storeName=STORE_NAMES[sk];
-  const startStr=startDate.toLocaleDateString('fr-FR');
-  const endStr=new Date(endVal).toLocaleDateString('fr-FR');
   const today=new Date().toLocaleDateString('fr-FR');
   // HEADER
   doc.setFillColor(30,92,58);doc.rect(0,0,W,34,'F');
