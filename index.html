@@ -881,7 +881,7 @@ function openStore(){
   document.getElementById('ss-badge').textContent=STORE_NAMES[st.storeKey];
   document.getElementById('ss-date-badge').textContent=fmtDate().split(' ').slice(0,2).join(' ');
   buildPdvTabs();
-  buildPertesTab();
+  if(st.profile!=='Village')buildPertesTab();
   show('ss');
   // Show manager notice if exists
   if(db.notice&&db.notice.message){
@@ -985,6 +985,7 @@ function buildPdvTabs(){
     tcsEl.appendChild(tc);
   });
   updateFooter();
+  if(st.profile==='Village')return;
   // Add Inventaire tab
   const invBtn=document.createElement('button');
   invBtn.className='tab';
@@ -1010,7 +1011,8 @@ function buildPdvTabs(){
   invDateBar.appendChild(invDateInp);
   invBody.appendChild(invDateBar);
   // Build sections
-  INV_SECTIONS.forEach(cat=>{
+  const activeInvSections=st.profile==='Village'?['LABO']:INV_SECTIONS;
+  activeInvSections.forEach(cat=>{
     const prods=PRODUCTS[cat]||[];
     if(!prods.length)return;
     const label=PDV_CAT_LABELS[cat]||cat;
@@ -1114,7 +1116,7 @@ function buildPertesTab(){
   datebar.appendChild(di);
   perteBody.appendChild(datebar);
   // All products grouped by cat
-  const ALL_CATS=['LABO','PRO A PRO','BOISSON','BIO IMPORT','FL','AUTRES'];
+  const ALL_CATS=st.profile==='Village'?['LABO']:['LABO','PRO A PRO','BOISSON','BIO IMPORT','FL','AUTRES'];
   st.pertes=st.pertes||{};
   ALL_CATS.forEach(cat=>{
     const prods=PRODUCTS[cat]||[];
@@ -3249,7 +3251,6 @@ function genChefPDF(sk,type){
         grouped[sub].forEach(item=>{
           if(y>272){doc.addPage();y=20;}
           if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}doc.setTextColor(30,30,30);
-          const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[item.key]!=null?String(stockEntry.stocks[item.key]):'—';
           doc.setFontSize(8);
           doc.text(item.name,M+2,y+1);doc.text(item.unit,W-M-24,y+1);doc.text(String(item.q),W-M,y+1,{align:'right'});
           doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);
@@ -3304,7 +3305,7 @@ function genMgrPDF(cat){
     else{
       doc.setFillColor(30,92,58);doc.rect(M,y,W-2*M,7,'F');
       doc.setTextColor(245,240,232);doc.setFontSize(8);doc.setFont('helvetica','bold');
-      doc.text('Produit',M+2,y+5);doc.text('Unité',W-M-24,y+5);doc.text('Qté',W-M,y+5,{align:'right'});
+      doc.text('Produit',M+2,y+5);doc.text('Unité',W-M-42,y+5);doc.text('Stock PDV',W-M-20,y+5,{align:'right'});doc.text('Qté',W-M,y+5,{align:'right'});
       y+=9;let rowIdx=0;
       if(!singleSub){
         subsOrder.forEach(sub=>{
@@ -3317,7 +3318,10 @@ function genMgrPDF(cat){
             if(y>272){doc.addPage();y=20;}
             if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}doc.setTextColor(30,30,30);
             const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
-            doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-24,y+1);doc.text(String(agg[i]),W-M,y+1,{align:'right'});
+            doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-42,y+1);
+            doc.setTextColor(stk==='0'?200,50,50:stk==='—'?160,160,160:30,92,58);
+            doc.text(stk,W-M-20,y+1,{align:'right'});
+            doc.setTextColor(30,30,30);doc.text(String(agg[i]),W-M,y+1,{align:'right'});
             doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
           });y+=3;
         });
@@ -3326,7 +3330,10 @@ function genMgrPDF(cat){
           if(y>272){doc.addPage();y=20;}
           if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}doc.setTextColor(30,30,30);
           const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
-          doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-24,y+1);doc.text(String(q),W-M,y+1,{align:'right'});
+          doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-42,y+1);
+          doc.setTextColor(stk==='0'?200,50,50:stk==='—'?160,160,160:30,92,58);
+          doc.text(stk,W-M-20,y+1,{align:'right'});
+          doc.setTextColor(30,30,30);doc.text(String(q),W-M,y+1,{align:'right'});
           doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
         });
       }
