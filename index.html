@@ -426,9 +426,9 @@ body{background:var(--g);min-height:100vh;}
           <div style="font-size:10px;font-weight:700;color:#3D2E1E;flex:1;text-align:left;">ZAC 2000</div>
           <div style="font-size:14px;color:#C4B49A;">›</div>
         </button>
-        <button onclick="goPin('Village','Vitaly Village')" style="background:#F7F0E4;border:1px solid rgba(139,114,80,.15);border-radius:11px;padding:9px 13px;display:flex;align-items:center;gap:11px;cursor:pointer;">
+        <button onclick="goPin('Village','Village')" style="background:#F7F0E4;border:1px solid rgba(139,114,80,.15);border-radius:11px;padding:9px 13px;display:flex;align-items:center;gap:11px;cursor:pointer;">
           <div style="width:30px;height:30px;border-radius:7px;background:#1E5C3A;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="14" height="14" viewBox="-8 -8 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M 0 -0.3 C -1.5 -1.8 -2.2 -4.5 -1.1 -7 C -0.5 -8.5 0.5 -8.5 1.1 -7 C 2.2 -4.5 1.5 -1.8 0 -0.3Z" fill="#DCE775" transform="rotate(-60)"/><path d="M 0 -0.3 C -2.7 -2.7 -4.5 -7 -2.3 -10.5 C -1.1 -12.5 1.1 -12.5 2.3 -10.5 C 4.5 -7 2.7 -2.7 0 -0.3Z" fill="#558B2F" transform="rotate(30)"/><path d="M 0 -0.3 C -2 -2.2 -3.4 -5.6 -1.9 -8.6 C -0.9 -10.5 0.9 -10.5 1.9 -8.6 C 3.4 -5.6 2 -2.2 0 -0.3Z" fill="#E8613A" transform="rotate(150)"/></svg></div>
-          <div style="font-size:10px;font-weight:700;color:#3D2E1E;flex:1;text-align:left;">Vitaly Village</div>
+          <div style="font-size:10px;font-weight:700;color:#3D2E1E;flex:1;text-align:left;">Village</div>
           <div style="font-size:14px;color:#C4B49A;">›</div>
         </button>
       </div>
@@ -513,7 +513,7 @@ body{background:var(--g);min-height:100vh;}
 // Default PINs (overridden by Firebase if saved)
 let PINS={chef:'1245',manager:'2356',LePort:'2626',SacreCoeur:'2323',Portail:'2424',Savannah:'2727',ZAC2000:'2525',Village:'2828'};
 const STORE_KEYS=['LePort','SacreCoeur','Portail','Savannah','ZAC2000','Village'];
-const STORE_NAMES={LePort:'Le Port',SacreCoeur:'Sacré Coeur',Portail:'Portail',Savannah:'Savannah',ZAC2000:'ZAC 2000',Village:'Vitaly Village'};
+const STORE_NAMES={LePort:'Le Port',SacreCoeur:'Sacré Coeur',Portail:'Portail',Savannah:'Savannah',ZAC2000:'ZAC 2000',Village:'Village'};
 const PDV_CATS=['LABO','PRO A PRO','PACKAGING','HYGIENE','BOISSON','BIO IMPORT','FL','AUTRES'];
 const INV_SECTIONS=['LABO','PRO A PRO','PACKAGING','HYGIENE','BOISSON','BIO IMPORT','FL','AUTRES'];
 const PDV_CAT_LABELS={'LABO':'LABO','PRO A PRO':'PRO A PRO','PACKAGING':'PACKAGING','HYGIENE':'HYGIÈNE','BOISSON':'BOISSON','BIO IMPORT':'BIO IMPORT','FL':'F&L','AUTRES':'AUTRES'};
@@ -898,7 +898,8 @@ function buildPdvTabs(){
   const tabsEl=document.getElementById('ss-tabs');
   const tcsEl=document.getElementById('ss-tcs');
   tabsEl.innerHTML='';tcsEl.innerHTML='';
-  PDV_CATS.forEach((cat,ci)=>{
+  const activeCats=st.profile==='Village'?['LABO']:PDV_CATS;
+  activeCats.forEach((cat,ci)=>{
     const label=PDV_CAT_LABELS[cat];
     const dest=catDest(cat);
     const btn=document.createElement('button');
@@ -2818,7 +2819,7 @@ const PIN_LABELS={
   Portail:'Portail',
   Savannah:'Savannah',
   ZAC2000:'ZAC 2000',
-  Village:'Vitaly Village'
+  Village:'Village'
 };
 
 function renderSettings(tcid){
