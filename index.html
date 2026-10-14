@@ -3319,7 +3319,7 @@ function genMgrPDF(cat){
             if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}doc.setTextColor(30,30,30);
             const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
             doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-42,y+1);
-            doc.setTextColor(stk==='0'?200,50,50:stk==='—'?160,160,160:30,92,58);
+            if(stk==='0')doc.setTextColor(200,50,50);else if(stk==='—')doc.setTextColor(160,160,160);else doc.setTextColor(30,92,58);
             doc.text(stk,W-M-20,y+1,{align:'right'});
             doc.setTextColor(30,30,30);doc.text(String(agg[i]),W-M,y+1,{align:'right'});
             doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
@@ -3331,7 +3331,7 @@ function genMgrPDF(cat){
           if(rowIdx%2===0){doc.setFillColor(248,247,245);doc.rect(M,y-3,W-2*M,6,'F');}else{doc.setFillColor(255,255,255);doc.rect(M,y-3,W-2*M,6,'F');}doc.setTextColor(30,30,30);
           const stk=stockEntry&&stockEntry.stocks&&stockEntry.stocks[cat+'__'+i]!=null?String(stockEntry.stocks[cat+'__'+i]):'—';
           doc.setFontSize(8);doc.text(p.name,M+2,y+1);doc.text(p.unit,W-M-42,y+1);
-          doc.setTextColor(stk==='0'?200,50,50:stk==='—'?160,160,160:30,92,58);
+          if(stk==='0')doc.setTextColor(200,50,50);else if(stk==='—')doc.setTextColor(160,160,160);else doc.setTextColor(30,92,58);
           doc.text(stk,W-M-20,y+1,{align:'right'});
           doc.setTextColor(30,30,30);doc.text(String(q),W-M,y+1,{align:'right'});
           doc.setDrawColor(220,218,212);doc.line(M,y+3,W-M,y+3);y+=6;rowIdx++;
