@@ -1877,10 +1877,15 @@ function renderCatalogue(tcid){
     subs[sub].forEach(({p,i})=>{
       const key='LABO__'+i;
       const isOn=db.catalogue[key]!==false;
-      html+='<div class="cat-toggle-row" onclick="toggleCatalogue(\''+key+'\')">';
+      html+='<div class="cat-toggle-row" style="position:relative;">';
+      html+='<div style="display:flex;align-items:center;flex:1;cursor:pointer;" onclick="toggleCatalogue(\''+key+'\')">';
       html+='<div class="toggle-switch '+(isOn?'on':'')+'" id="tog_'+safeId(key)+'"></div>';
       html+='<span class="cat-toggle-name">'+p.name+'</span>';
       html+='<span class="cat-toggle-sub">'+p.unit+'</span>';
+      html+='</div>';
+      if(p.custom){
+        html+='<button onclick="deleteCustomProduct('+i+',\''+p.name.replace(/'/g,"\\'")+'\')" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:#c62828;font-size:14px;flex-shrink:0;" title="Supprimer ce produit">🗑</button>';
+      }
       html+='</div>';
     });
     html+='</div>';
@@ -1924,6 +1929,28 @@ async function saveNewProduct(){
   const activeTc=document.querySelector('#sc-tcs .tc.active');
   if(activeTc)renderCatalogue(activeTc.id);
   alert('Produit "'+name+'" ajouté avec succès !');
+}
+
+async function deleteCustomProduct(idx,name){
+  if(!confirm('Supprimer le produit "'+name+'" du catalogue LABO ?'))return;
+  // Remove from PRODUCTS array
+  PRODUCTS['LABO'].splice(idx,1);
+  // Remove from _customProducts in Firebase
+  const customProds=(db.catalogue._customProducts||[]).filter(p=>p.name!==name);
+  db.catalogue._customProducts=customProds;
+  // Clean up any catalogue key for this product and rebuild keys for shifted indices
+  // Rebuild catalogue keys from scratch for custom products
+  const newCat={_customProducts:customProds,_updatedAt:Date.now()};
+  // Keep availability flags for non-custom (by index, re-map after splice)
+  PRODUCTS['LABO'].forEach((_,i)=>{
+    const key='LABO__'+i;
+    if(db.catalogue[key]===false)newCat[key]=false;
+  });
+  db.catalogue=newCat;
+  await saveCatalogue({...newCat});
+  // Re-render
+  const activeTc=document.querySelector('#sc-tcs .tc.active');
+  if(activeTc)renderCatalogue(activeTc.id);
 }
 
 // Manager
