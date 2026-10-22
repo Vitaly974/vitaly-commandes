@@ -675,6 +675,7 @@ function isProdAvailable(cat,i){
   const key=cat+'__'+i;
   if(cat!=='LABO')return true;
   if(Object.keys(db.catalogue).length===0)return true;
+  if(db.catalogue['_hidden_'+key])return false;
   return db.catalogue[key]!==false;
 }
 
@@ -1876,6 +1877,7 @@ function renderCatalogue(tcid){
     html+='<div class="catalogue-section"><div class="catalogue-section-title">'+sub+'</div>';
     subs[sub].forEach(({p,i})=>{
       const key='LABO__'+i;
+      if(db.catalogue['_hidden_'+key])return; // produit masqué définitivement
       const isOn=db.catalogue[key]!==false;
       html+='<div class="cat-toggle-row" style="position:relative;">';
       html+='<div style="display:flex;align-items:center;flex:1;cursor:pointer;" onclick="toggleCatalogue(\''+key+'\')">';
@@ -1883,15 +1885,17 @@ function renderCatalogue(tcid){
       html+='<span class="cat-toggle-name">'+p.name+'</span>';
       html+='<span class="cat-toggle-sub">'+p.unit+'</span>';
       html+='</div>';
-      if(p.custom){
-        html+='<button onclick="deleteCustomProduct('+i+',\''+p.name.replace(/'/g,"\\'")+'\')" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:#c62828;font-size:14px;flex-shrink:0;" title="Supprimer ce produit">🗑</button>';
-      }
+      html+='<button onclick="deleteCustomProduct('+i+',\''+p.name.replace(/'/g,"\\'")+'\','+!!p.custom+')" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:#c62828;font-size:14px;flex-shrink:0;" title="Supprimer ce produit">🗑</button>';
       html+='</div>';
     });
     html+='</div>';
   });
   html+='</div>';
-  html+='<div style="padding:0 10px 10px;"><button onclick="openAddProduct()" style="width:100%;padding:12px;border-radius:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--g);color:var(--cr);">+ Ajouter un nouveau produit LABO</button></div>';
+  const hasHidden=Object.keys(db.catalogue).some(k=>k.startsWith('_hidden_'));
+  html+='<div style="padding:0 10px 10px;display:flex;flex-direction:column;gap:8px;">';
+  html+='<button onclick="openAddProduct()" style="width:100%;padding:12px;border-radius:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--g);color:var(--cr);">+ Ajouter un nouveau produit LABO</button>';
+  if(hasHidden)html+='<button onclick="restoreHiddenProducts()" style="width:100%;padding:10px;border-radius:10px;border:.5px dashed #c62828;font-size:11px;font-weight:700;cursor:pointer;background:rgba(198,40,40,.06);color:#c62828;">↩ Restaurer les produits supprimés</button>';
+  html+='</div>';
   tc.innerHTML=html;
 }
 
@@ -1931,23 +1935,36 @@ async function saveNewProduct(){
   alert('Produit "'+name+'" ajouté avec succès !');
 }
 
-async function deleteCustomProduct(idx,name){
-  if(!confirm('Supprimer le produit "'+name+'" du catalogue LABO ?'))return;
-  // Remove from PRODUCTS array
-  PRODUCTS['LABO'].splice(idx,1);
-  // Remove from _customProducts in Firebase
-  const customProds=(db.catalogue._customProducts||[]).filter(p=>p.name!==name);
-  db.catalogue._customProducts=customProds;
-  // Clean up any catalogue key for this product and rebuild keys for shifted indices
-  // Rebuild catalogue keys from scratch for custom products
-  const newCat={_customProducts:customProds,_updatedAt:Date.now()};
-  // Keep availability flags for non-custom (by index, re-map after splice)
-  PRODUCTS['LABO'].forEach((_,i)=>{
-    const key='LABO__'+i;
-    if(db.catalogue[key]===false)newCat[key]=false;
-  });
-  db.catalogue=newCat;
-  await saveCatalogue({...newCat});
+async function restoreHiddenProducts(){
+  if(!confirm('Restaurer tous les produits masqués ?'))return;
+  Object.keys(db.catalogue).forEach(k=>{if(k.startsWith('_hidden_'))delete db.catalogue[k];});
+  await saveCatalogue({...db.catalogue});
+  const activeTc=document.querySelector('#sc-tcs .tc.active');
+  if(activeTc)renderCatalogue(activeTc.id);
+}
+
+async function deleteCustomProduct(idx,name,isCustom){
+  if(!confirm('Supprimer le produit "'+name+'" du catalogue LABO ?\n\nIl n\'apparaîtra plus dans les commandes PDV.'))return;
+  if(isCustom){
+    // Produit custom : suppression réelle du tableau et de Firebase
+    PRODUCTS['LABO'].splice(idx,1);
+    const customProds=(db.catalogue._customProducts||[]).filter(p=>p.name!==name);
+    db.catalogue._customProducts=customProds;
+    const newCat={_customProducts:customProds,_updatedAt:Date.now()};
+    PRODUCTS['LABO'].forEach((_,i)=>{
+      const key='LABO__'+i;
+      if(db.catalogue[key]===false)newCat[key]=false;
+      if(db.catalogue['_hidden_'+key])newCat['_hidden_'+key]=true;
+    });
+    db.catalogue=newCat;
+    await saveCatalogue({...newCat});
+  } else {
+    // Produit de base : masquage permanent via flag _hidden
+    const key='LABO__'+idx;
+    db.catalogue['_hidden_'+key]=true;
+    db.catalogue[key]=false; // aussi désactivé
+    await saveCatalogue({...db.catalogue});
+  }
   // Re-render
   const activeTc=document.querySelector('#sc-tcs .tc.active');
   if(activeTc)renderCatalogue(activeTc.id);
